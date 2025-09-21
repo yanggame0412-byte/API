@@ -1,0 +1,2262 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Indoor Navigation Assistant</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: #000000;
+            color: #FFFFFF;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            font-size: 20px;
+            line-height: 1.6;
+            touch-action: pan-y;
+            user-select: none;
+        }
+
+        /* High contrast focus indicators */
+        *:focus {
+            outline: 4px solid #FFFF00;
+            outline-offset: 2px;
+        }
+
+        .container {
+            flex: 1;
+            padding: 20px;
+            max-width: 600px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #1a1a1a;
+            border: 3px solid #FFFFFF;
+            border-radius: 10px;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #FFFFFF;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            font-size: 1.2rem;
+            color: #CCCCCC;
+        }
+
+        /* Main control area */
+        .main-controls {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .big-button {
+            padding: 25px 30px;
+            font-size: 1.5rem;
+            font-weight: bold;
+            border: 3px solid #FFFFFF;
+            background: #333333;
+            color: #FFFFFF;
+            border-radius: 15px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-align: center;
+            min-height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .big-button:hover,
+        .big-button:focus {
+            background: #FFFFFF;
+            color: #000000;
+            transform: scale(1.05);
+        }
+
+        .big-button:active {
+            transform: scale(0.95);
+        }
+
+        .big-button.active {
+            background: #00FF00;
+            color: #000000;
+            border-color: #00FF00;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        .big-button.listening {
+            background: #FF6600;
+            border-color: #FF6600;
+            animation: pulse 1s ease-in-out infinite;
+        }
+
+        .big-button.qr-scanning {
+            background: #0066FF;
+            border-color: #0066FF;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.7;
+            }
+        }
+
+        /* Status and results */
+        .status-panel {
+            background: #1a1a1a;
+            border: 3px solid #FFFFFF;
+            border-radius: 10px;
+            padding: 25px;
+            margin-bottom: 20px;
+        }
+
+        .status-title {
+            font-size: 1.3rem;
+            font-weight: bold;
+            color: #FFFF00;
+            margin-bottom: 15px;
+        }
+
+        .status-content {
+            font-size: 1.1rem;
+            color: #FFFFFF;
+            min-height: 50px;
+        }
+
+        .result-panel {
+            background: #0a3d0a;
+            border: 3px solid #00FF00;
+            border-radius: 10px;
+            padding: 25px;
+            margin-bottom: 20px;
+        }
+
+        .result-title {
+            font-size: 1.3rem;
+            font-weight: bold;
+            color: #00FF00;
+            margin-bottom: 15px;
+        }
+
+        .result-content {
+            font-size: 1.1rem;
+            color: #FFFFFF;
+            min-height: 50px;
+            word-break: break-word;
+        }
+
+        /* Route panel */
+        .route-panel {
+            background: #1a1a3d;
+            border: 3px solid #66AAFF;
+            border-radius: 10px;
+            padding: 25px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .route-panel.show {
+            display: block;
+        }
+
+        .route-title {
+            font-size: 1.3rem;
+            font-weight: bold;
+            color: #66AAFF;
+            margin-bottom: 15px;
+        }
+
+        .route-content {
+            font-size: 1.1rem;
+            color: #FFFFFF;
+        }
+
+        /* Voice status indicator */
+        .voice-status {
+            background: #2d1b0e;
+            border: 3px solid #FF6600;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .voice-status.show {
+            display: block;
+        }
+
+        .voice-status-text {
+            color: #FF6600;
+            font-weight: bold;
+            text-align: center;
+        }
+
+        /* Gesture instructions */
+        .gesture-help {
+            background: #2a2a00;
+            border: 3px solid #FFFF00;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+
+        .gesture-help h3 {
+            color: #FFFF00;
+            margin-bottom: 15px;
+            font-size: 1.3rem;
+        }
+
+        .gesture-item {
+            margin: 10px 0;
+            font-size: 1rem;
+            color: #FFFFFF;
+        }
+
+        .gesture-item::before {
+            content: "👆 ";
+            margin-right: 10px;
+        }
+
+        /* Video container */
+        #videoContainer {
+            display: none;
+            margin: 20px auto;
+            max-width: 600px;
+            text-align: center;
+        }
+
+        #videoContainer.show {
+            display: block;
+        }
+
+        #canvas {
+            display: none;
+        }
+
+        #video {
+            width: 100%;
+            max-width: 500px;
+            height: auto;
+            border: 3px solid #FFFFFF;
+            border-radius: 10px;
+            background: #000;
+        }
+
+        /* Loading indicator */
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+            font-size: 1.2rem;
+            color: #FFFF00;
+        }
+
+        .loading.show {
+            display: block;
+        }
+
+        /* Announcement for screen readers */
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+
+        #announcements {
+            position: absolute;
+            top: -9999px;
+        }
+
+        /* Connection status indicator */
+        .connection-status {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+
+        .connection-online {
+            background: #00AA00;
+            color: white;
+        }
+
+        .connection-offline {
+            background: #AA0000;
+            color: white;
+        }
+
+        .connection-fallback {
+            background: #AAAA00;
+            color: black;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="connection-status" id="connectionStatus">Connecting...</div>
+
+    <div class="container" id="mainContainer">
+        <div class="header">
+            <h1>Indoor Navigation</h1>
+            <div class="subtitle">QR-Based Navigation Assistant</div>
+        </div>
+
+        <!-- Video container -->
+        <div id="videoContainer">
+            <video id="video" autoplay muted playsinline></video>
+            <canvas id="canvas"></canvas>
+        </div>
+
+        <div class="main-controls">
+            <button class="big-button" id="qrBtn" onclick="startQRScanning()">
+                📱 TAP TO SCAN QR CODE
+            </button>
+
+            <button class="big-button" id="cameraBtn" onclick="toggleCamera()">
+                TAP TO START NAVIGATION
+            </button>
+
+            <button class="big-button" id="voiceBtn" onclick="toggleVoice()">
+                🎤 TAP FOR VOICE COMMANDS
+            </button>
+        </div>
+
+        <!-- Voice status indicator -->
+        <div class="voice-status" id="voiceStatus">
+            <div class="voice-status-text" id="voiceStatusText">Voice recognition ready</div>
+        </div>
+
+        <div class="status-panel">
+            <div class="status-title">Navigation Status</div>
+            <div class="status-content" id="status">
+                Ready to navigate. First, scan a QR code to set your starting location.
+            </div>
+        </div>
+
+        <div class="route-panel" id="routePanel">
+            <div class="route-title">Current Route</div>
+            <div class="route-content" id="routeContent">
+                No active route.
+            </div>
+        </div>
+
+        <div class="result-panel">
+            <div class="result-title">Current Instruction</div>
+            <div class="result-content" id="result">
+                Scan QR code to begin navigation setup.
+            </div>
+        </div>
+
+        <div class="loading" id="loading">
+            🔄 Processing navigation data...
+        </div>
+
+        <div class="gesture-help">
+            <h3>Voice Commands</h3>
+            <div class="gesture-item">Scan QR code</div>
+            <div class="gesture-item">Go to [room name]</div>
+            <div class="gesture-item">Where am I</div>
+            <div class="gesture-item">Stop navigation</div>
+            <div class="gesture-item">Repeat instruction</div>
+            <div class="gesture-item">Help</div>
+        </div>
+    </div>
+
+    <!-- Screen reader announcements -->
+    <div id="announcements" aria-live="assertive" aria-atomic="true"></div>
+
+    <script src="https://unpkg.com/jsqr@1.4.0/dist/jsQR.js"></script>
+    <script>
+        // Navigation system state
+        const NavigationMode = {
+            IDLE: 'idle',
+            QR_SCANNING: 'qr_scanning',
+            QR_GUIDING: 'qr_guiding',
+            DESTINATION_INPUT: 'destination_input',
+            NAVIGATING: 'navigating'
+        };
+
+        let currentMode = NavigationMode.IDLE;
+        let currentLocation = null;
+        let destination = null;
+        let currentRoute = null;
+        let routeStep = 0;
+
+        // QR scanning state
+        let qrScanningFeedbackTimer = null;
+        let lastQRUpdateTime = 0;
+        let qrFeedbackInterval = 3000;
+
+        // Building graph and room information
+        const buildingGraph = {
+            "NG1": ["NG2"],
+            "NG2": ["NG1", "NG3"],
+            "NG3": ["NG2", "NG4"],
+            "NG4": ["NG3", "NG5"],
+            "NG5": ["NG4", "NG6"],
+            "NG6": ["NG5", "NG7"],
+            "NG7": ["NG6", "NG8", "N007"],
+            "NG8": ["NG7", "NG9", "N008", "NG_SOUTH1"],
+            "NG9": ["NG8", "NG10"],
+            "NG10": ["NG9", "NG11"],
+            "NG11": ["NG10", "NG12"],
+            "NG12": ["NG11", "NG13"],
+            "NG13": ["NG12", "NG14"],
+            "NG14": ["NG13", "NG15"],
+            "NG15": ["NG14", "NG16"],
+            "NG16": ["NG15", "NG17"],
+            "NG17": ["NG16", "NG18"],
+            "NG18": ["NG17", "NG19"],
+            "NG19": ["NG18", "NG20"],
+            "NG20": ["NG19", "NG21"],
+            "NG21": ["NG20", "NG22"],
+            "NG22": ["NG21", "NG23"],
+            "NG23": ["NG22", "NG24"],
+            "NG24": ["NG23", "NG25"],
+            "NG25": ["NG24", "NG26"],
+            "NG26": ["NG25", "NG27"],
+            "NG27": ["NG26", "NG28"],
+            "NG28": ["NG27", "NG29"],
+            "NG29": ["NG28", "N001"],
+
+            "N007": ["NG7", "OpenOffice", "N006"],
+            "OpenOffice": ["N007"],
+            "N006": ["N007", "N005"],
+            "N005": ["N006", "N004"],
+            "N004": ["N005", "N003"],
+            "N003": ["N004", "N002"],
+            "N002": ["N003", "N001"],
+            "N001": ["N002", "NG29"],
+
+            "NG_SOUTH1": ["NG8", "NG_SOUTH2"],
+            "NG_SOUTH2": ["NG_SOUTH1", "N008", "NG_SOUTH3"],
+            "NG_SOUTH3": ["NG_SOUTH2", "N009", "NG_SOUTH4"],
+            "NG_SOUTH4": ["NG_SOUTH3", "N010", "NG_SOUTH5"],
+            "NG_SOUTH5": ["NG_SOUTH4", "N011", "NG_SOUTH6"],
+            "NG_SOUTH6": ["NG_SOUTH5", "N012", "NG_SOUTH7"],
+            "NG_SOUTH7": ["NG_SOUTH6", "N013"],
+
+            "N008": ["NG8", "NG_SOUTH2"],
+            "N009": ["NG_SOUTH3"],
+            "N010": ["NG_SOUTH4"],
+            "N011": ["NG_SOUTH5"],
+            "N012": ["NG_SOUTH6"],
+            "N013": ["NG_SOUTH7"]
+        };
+
+        const roomInfo = {
+            "N001": "Lecture Room 1",
+            "N002": "Lecture Room 2",
+            "N003": "Lecture Room 3",
+            "N004": "Lecture Room 4",
+            "N005": "Lecture Room 5",
+            "N006": "Lecture Room 6",
+            "N007": "Corridor Junction",
+            "OpenOffice": "Open-Office Classroom",
+            "N008": "Microsoft Software Engineering Lab",
+            "N009": "Silverlake Lab",
+            "N010": "Cisco Lab",
+            "N011": "IPSTAR Lab",
+            "N012": "Lab N012",
+            "N013": "Lab N013",
+            "NG8": "Main Corridor Junction",
+            "NG29": "Lecture Hall Corridor Junction"
+        };
+
+        // QR Code detection constants
+        const QR_REAL_SIZE_CM = 20;
+        const CAMERA_FOCAL_LENGTH = 500;
+        const OPTIMAL_DISTANCE_MIN = 30;
+        const OPTIMAL_DISTANCE_MAX = 50;
+
+        // Navigation system variables
+        let video, canvas, ctx;
+        let scanning = false;
+        let stream = null;
+        let recognition = null;
+        let isListening = false;
+        let lastResult = '';
+        let lastSpokenInstruction = '';
+        //let apiUrl = 'https://3963b7f787ad.ngrok-free.app/';
+        let apiUrl = 'http://192.168.0.13:8000';
+        let isApiOnline = false;
+        let fallbackMode = false;
+        let processingQueue = [];
+        let isProcessing = false;
+
+        // Session management
+        let currentAnalyzeController = null;
+        let sessionId = null;
+
+        // Voice system improvements
+        let voiceQueue = [];
+        let isSpeaking = false;
+        let speechTimeouts = [];
+        let recognitionRestarting = false;
+        let voiceInputBuffer = '';
+        let lastVoiceInputTime = 0;
+
+        // Navigation logic improvements
+        let lastNavigationInstruction = '';
+        let instructionRepeatCount = 0;
+        let lastInstructionTime = 0;
+        let navigationInstructionTimeout = null;
+
+        // Performance tracking
+        let frameCount = 0;
+        let lastFrameTime = Date.now();
+        let processingTimes = [];
+
+        // Initialize on load
+        document.addEventListener('DOMContentLoaded', function () {
+            video = document.getElementById('video');
+            canvas = document.getElementById('canvas');
+            ctx = canvas.getContext('2d');
+
+            if (typeof jsQR === 'undefined') {
+                console.error('jsQR library failed to load from CDN');
+                queueSpeech('QR scanning not available. Library loading failed.', 'info');
+            } else {
+                console.log('jsQR library loaded successfully');
+            }
+
+            setupSpeechRecognition();
+            setupGestureHandling();
+            //setupKeyboardNavigation();
+            setupContinuousVoice();
+
+            testApiConnection();
+            startConnectionMonitoring();
+
+            setTimeout(() => {
+                announceToScreenReader('Indoor Navigation System loaded. Scan QR code to start.');
+                const qrStatus = typeof jsQR !== 'undefined' ? 'QR scanning available.' : 'QR scanning unavailable.';
+                queueSpeech(`Indoor Navigation System ready. ${qrStatus} First, scan a QR code to set your starting location.`, 'normal');
+            }, 500);
+        });
+
+        // === IMPROVED NAVIGATION LOGIC ===
+
+        function handleNavigationResponse(data) {
+            try {
+                let instruction = data.instruction || 'Navigation system processing';
+                const now = Date.now();
+
+                // Enhanced directional instruction processing
+                const directionalInstruction = parseDirectionalInstruction(instruction);
+
+                // Check if this is the same instruction as before
+                if (instruction === lastNavigationInstruction) {
+                    instructionRepeatCount++;
+
+                    // Only speak if enough time has passed or it's urgent
+                    const timeSinceLastInstruction = now - lastInstructionTime;
+                    const shouldSpeak = timeSinceLastInstruction > 5000 || // 5 seconds minimum
+                        data.is_urgent ||
+                        instructionRepeatCount === 1; // First repeat
+
+                    if (!shouldSpeak) {
+                        // Update UI but don't speak
+                        updateResult(instruction);
+                        return;
+                    }
+                } else {
+                    // New instruction
+                    instructionRepeatCount = 0;
+                    lastNavigationInstruction = instruction;
+                }
+
+                lastInstructionTime = now;
+
+                // Add route context if navigating
+                if (currentMode === NavigationMode.NAVIGATING && currentRoute) {
+                    const routeInstruction = getRouteInstruction();
+                    if (routeInstruction !== 'You have arrived at your destination.') {
+                        instruction = `${instruction} ${routeInstruction}`;
+                    }
+                }
+
+                const isUrgent = data.is_urgent || directionalInstruction.isUrgent;
+
+                updateResult(instruction);
+                updateStatus(`Navigation: ${instruction}`);
+
+                // Enhanced audio feedback for directional instructions
+                provideAudioFeedbackForDirection(directionalInstruction, instruction, isUrgent);
+
+                // Enhanced haptic feedback based on direction
+                provideHapticFeedback(directionalInstruction, isUrgent);
+
+                lastResult = instruction;
+
+                console.log('Navigation Response:', {
+                    instruction: instruction,
+                    direction: directionalInstruction,
+                    urgent: isUrgent,
+                    repeatCount: instructionRepeatCount,
+                    zones: data.zones,
+                    processingTime: data.processing_time_ms
+                });
+
+            } catch (error) {
+                console.error('Navigation response handling error:', error);
+            }
+        }
+
+        // Parse directional instructions from backend
+        function parseDirectionalInstruction(instruction) {
+            const lowerInstruction = instruction.toLowerCase();
+
+            return {
+                hasDirection: lowerInstruction.includes('go left') || lowerInstruction.includes('go right') ||
+                    lowerInstruction.includes('turn left') || lowerInstruction.includes('turn right'),
+                direction: lowerInstruction.includes('left') ? 'left' :
+                    lowerInstruction.includes('right') ? 'right' : 'forward',
+                hasPerson: lowerInstruction.includes('person'),
+                hasObject: lowerInstruction.includes('object') || lowerInstruction.includes('obstacle'),
+                isBlocked: lowerInstruction.includes('blocked') || lowerInstruction.includes('stop'),
+                isUrgent: lowerInstruction.includes('person') || lowerInstruction.includes('blocked') ||
+                    lowerInstruction.includes('stop')
+            };
+        }
+
+        // Enhanced audio feedback for directions with spatial audio cues
+        function provideAudioFeedbackForDirection(directionalInfo, instruction, isUrgent) {
+            // Create enhanced audio instruction with clearer directional guidance
+            let enhancedInstruction = instruction;
+
+            if (directionalInfo.hasDirection) {
+                // Add emphasis and clarity for directional commands
+                if (directionalInfo.direction === 'left') {
+                    enhancedInstruction = instruction.replace(/go left/gi, 'turn LEFT now');
+                    // Add spatial audio cue if possible
+                    playDirectionalAudioCue('left', isUrgent);
+                } else if (directionalInfo.direction === 'right') {
+                    enhancedInstruction = instruction.replace(/go right/gi, 'turn RIGHT now');
+                    // Add spatial audio cue if possible
+                    playDirectionalAudioCue('right', isUrgent);
+                }
+            }
+
+            // Enhanced priority speech with different voice characteristics
+            if (directionalInfo.isBlocked) {
+                queueSpeech(enhancedInstruction, 'urgent', true); // Interrupt immediately
+            } else if (directionalInfo.hasPerson) {
+                queueSpeech(enhancedInstruction, 'urgent'); // High priority
+            } else if (directionalInfo.hasDirection) {
+                queueSpeech(enhancedInstruction, 'normal'); // Clear directional guidance
+            } else if (enhancedInstruction !== lastSpokenInstruction || isUrgent) {
+                queueSpeech(enhancedInstruction, isUrgent ? 'urgent' : 'normal');
+                lastSpokenInstruction = enhancedInstruction;
+            }
+        }
+
+        // Play directional audio cues (beeps/tones) to indicate direction
+        function playDirectionalAudioCue(direction, isUrgent) {
+            try {
+                // Create audio context for spatial audio cues
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+                const panNode = audioContext.createStereoPanner();
+
+                // Connect audio nodes
+                oscillator.connect(gainNode);
+                gainNode.connect(panNode);
+                panNode.connect(audioContext.destination);
+
+                // Set frequency based on urgency
+                oscillator.frequency.setValueAtTime(isUrgent ? 800 : 600, audioContext.currentTime);
+
+                // Set pan based on direction (-1 = left, +1 = right)
+                panNode.pan.setValueAtTime(direction === 'left' ? -0.8 : 0.8, audioContext.currentTime);
+
+                // Set volume and envelope
+                gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+                gainNode.gain.linearRampToValueAtTime(0.3, audioContext.currentTime + 0.01);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + 0.3);
+
+                // Play 2-3 beeps for direction with spatial positioning
+                if (direction === 'left') {
+                    setTimeout(() => playDirectionalBeep(audioContext, -0.8, isUrgent), 100);
+                    setTimeout(() => playDirectionalBeep(audioContext, -0.8, isUrgent), 200);
+                } else {
+                    setTimeout(() => playDirectionalBeep(audioContext, 0.8, isUrgent), 100);
+                    setTimeout(() => playDirectionalBeep(audioContext, 0.8, isUrgent), 200);
+                }
+
+            } catch (error) {
+                console.log('Audio cue not available:', error);
+            }
+        }
+
+        function playDirectionalBeep(audioContext, pan, isUrgent) {
+            try {
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+                const panNode = audioContext.createStereoPanner();
+
+                oscillator.connect(gainNode);
+                gainNode.connect(panNode);
+                panNode.connect(audioContext.destination);
+
+                oscillator.frequency.setValueAtTime(isUrgent ? 900 : 700, audioContext.currentTime);
+                panNode.pan.setValueAtTime(pan, audioContext.currentTime);
+
+                gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+                gainNode.gain.linearRampToValueAtTime(0.2, audioContext.currentTime + 0.01);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.15);
+
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + 0.15);
+            } catch (error) {
+                console.log('Directional beep failed:', error);
+            }
+        }
+
+        // Enhanced haptic feedback patterns for visually impaired users
+        function provideHapticFeedback(directionalInfo, isUrgent) {
+            if (!navigator.vibrate) return;
+
+            if (directionalInfo.isBlocked) {
+                // Strong warning pattern for blocked path - unmistakable
+                navigator.vibrate([500, 200, 500, 200, 500]);
+            } else if (directionalInfo.hasPerson) {
+                // Person detected pattern - distinct from objects
+                navigator.vibrate([300, 100, 300, 100, 300, 100, 100]);
+            } else if (directionalInfo.direction === 'left') {
+                // Left direction pattern: distinctive short-long-short rhythm
+                navigator.vibrate([100, 100, 300, 100, 100]);
+            } else if (directionalInfo.direction === 'right') {
+                // Right direction pattern: distinctive long-short-long rhythm
+                navigator.vibrate([300, 100, 100, 100, 300]);
+            } else if (directionalInfo.hasObject) {
+                // Object detected - different from person
+                navigator.vibrate([200, 50, 200]);
+            } else if (isUrgent) {
+                // General urgent pattern
+                navigator.vibrate([250, 100, 250]);
+            } else {
+                // Standard feedback - path clear
+                navigator.vibrate([150]);
+            }
+        }
+
+        // === IMPROVED API ANALYSIS ===
+
+        async function analyzeNavigationWithRetry(imageData, maxRetries = 2) {
+            // Prevent overlapping requests
+            if (currentAnalyzeController) {
+                return;
+            }
+
+            let lastError = null;
+
+            for (let attempt = 1; attempt <= maxRetries; attempt++) {
+                if (!scanning || currentMode !== NavigationMode.NAVIGATING) return;
+
+                currentAnalyzeController = new AbortController();
+                const controller = currentAnalyzeController;
+
+                try {
+                    const timeoutId = setTimeout(() => controller.abort(), 8000); // Increased timeout
+                    const startTime = Date.now();
+
+                    const body = {
+                        image: imageData,
+                        return_annotated: false,
+                        session_id: sessionId
+                    };
+
+                    const response = await fetch(`${apiUrl}/analyze`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(body),
+                        signal: controller.signal
+                    });
+
+                    clearTimeout(timeoutId);
+
+                    if (!scanning || currentMode !== NavigationMode.NAVIGATING) {
+                        try { controller.abort(); } catch (e) { }
+                        currentAnalyzeController = null;
+                        return;
+                    }
+
+                    if (!response.ok) {
+                        throw new Error(`API Error: ${response.status}`);
+                    }
+
+                    const result = await response.json();
+                    const processingTime = Date.now() - startTime;
+
+                    processingTimes.push(processingTime);
+                    if (processingTimes.length > 50) {
+                        processingTimes.shift();
+                    }
+
+                    currentAnalyzeController = null;
+                    handleNavigationResponse(result);
+                    return;
+
+                } catch (error) {
+                    lastError = error;
+                    console.warn(`Analysis attempt ${attempt} failed:`, error);
+
+                    if (!scanning || (error && error.name === 'AbortError')) {
+                        currentAnalyzeController = null;
+                        return;
+                    }
+
+                    if (attempt === maxRetries) {
+                        isApiOnline = false;
+                        fallbackMode = true;
+                        updateConnectionStatus('fallback');
+                        generateFallbackNavigation(imageData);
+                    } else {
+                        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+                    }
+                } finally {
+                    if (currentAnalyzeController === controller) currentAnalyzeController = null;
+                }
+            }
+        }
+
+        // === IMPROVED SCANNING FUNCTION ===
+
+        function scanFrame() {
+            if (!video || video.paused || video.ended) return;
+            if (video.videoWidth === 0 || video.videoHeight === 0) {
+                setTimeout(scanFrame, 200);
+                return;
+            }
+
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            // Handle different modes
+            if (currentMode === NavigationMode.QR_SCANNING) {
+                const qrResult = detectQRCode();
+                if (qrResult) {
+                    handleQRDetection(qrResult);
+                } else {
+                    updateResult('Looking for QR code...');
+                }
+                setTimeout(scanFrame, 100); // Moderate speed for QR detection
+
+            } else if (currentMode === NavigationMode.NAVIGATING && scanning) {
+                // PRIORITY 1: Always check for QR codes first (highest priority)
+                const qrResult = detectQRCode();
+                if (qrResult) {
+                    console.log('QR detected during navigation, processing...');
+                    handleRouteProgressQR(qrResult);
+                    // Skip object detection this frame since QR is more important
+                    setTimeout(scanFrame, 200); // Quick rescan for more QR detection
+                } else {
+                    // PRIORITY 2: Only do object detection if no QR code found
+                    if (!currentAnalyzeController) {
+                        const imageData = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
+                        if (isApiOnline) {
+                            analyzeNavigationWithRetry(imageData);
+                        } else {
+                            generateFallbackNavigation(imageData);
+                        }
+                    }
+                    // Longer interval for object detection to prioritize QR scanning
+                    setTimeout(scanFrame, 800); // 0.8 seconds
+                }
+            }
+        }
+
+        // === QR CODE DETECTION FUNCTIONS ===
+
+        function startQRScanning() {
+            if (typeof jsQR === 'undefined') {
+                updateStatus('QR scanning unavailable. Library not loaded.');
+                queueSpeech('QR scanning not available. Please check internet connection.', 'urgent');
+                return;
+            }
+
+            if (currentMode === NavigationMode.QR_SCANNING) {
+                stopQRScanning();
+                return;
+            }
+
+            currentMode = NavigationMode.QR_SCANNING;
+            updateQRButton(true);
+            updateStatus('Starting QR code scanner...');
+
+            lastQRUpdateTime = 0;
+            queueSpeech('Starting QR scanner. Point camera at QR code.', 'normal');
+
+            startCamera(true);
+        }
+
+        function stopQRScanning() {
+            currentMode = NavigationMode.IDLE;
+            updateQRButton(false);
+            updateStatus('QR scanning stopped.');
+
+            if (qrScanningFeedbackTimer) {
+                clearTimeout(qrScanningFeedbackTimer);
+                qrScanningFeedbackTimer = null;
+            }
+
+            queueSpeech('QR scanning stopped.', 'info');
+            stopCamera();
+        }
+
+        function detectQRCode(frame) {
+            try {
+                if (typeof jsQR === 'undefined') {
+                    console.warn('jsQR library not loaded. QR detection disabled.');
+                    return null;
+                }
+
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const code = jsQR(imageData.data, imageData.width, imageData.height);
+
+                if (code) {
+                    const boundingBox = code.location;
+                    const qrWidth = Math.abs(boundingBox.topRightCorner.x - boundingBox.topLeftCorner.x);
+                    const distance = estimateQRDistance(qrWidth);
+                    const position = getQRPosition(boundingBox);
+
+                    return {
+                        data: code.data,
+                        distance: distance,
+                        position: position,
+                        boundingBox: boundingBox
+                    };
+                }
+                return null;
+            } catch (error) {
+                console.error('QR detection error:', error);
+                return null;
+            }
+        }
+
+        function estimateQRDistance(qrPixelWidth) {
+            return (QR_REAL_SIZE_CM * CAMERA_FOCAL_LENGTH) / qrPixelWidth;
+        }
+
+        function getQRPosition(boundingBox) {
+            const centerX = (boundingBox.topLeftCorner.x + boundingBox.topRightCorner.x) / 2;
+            const centerY = (boundingBox.topLeftCorner.y + boundingBox.bottomLeftCorner.y) / 2;
+            const frameWidth = canvas.width;
+            const frameHeight = canvas.height;
+
+            let horizontalPos = 'center';
+            let verticalPos = 'center';
+
+            if (centerX < frameWidth * 0.33) horizontalPos = 'left';
+            else if (centerX > frameWidth * 0.67) horizontalPos = 'right';
+
+            if (centerY < frameHeight * 0.33) verticalPos = 'up';
+            else if (centerY > frameHeight * 0.67) verticalPos = 'down';
+
+            return { horizontal: horizontalPos, vertical: verticalPos };
+        }
+
+        function handleQRDetection(qrResult) {
+            const distance = qrResult.distance;
+            const position = qrResult.position;
+            const now = Date.now();
+
+            const shouldSpeak = (now - lastQRUpdateTime) > qrFeedbackInterval;
+
+            if (distance > 200) {
+                let direction = '';
+                if (position.horizontal !== 'center') {
+                    direction += position.horizontal;
+                }
+                if (position.vertical !== 'center') {
+                    direction += (direction ? ' and ' : '') + position.vertical;
+                }
+
+                const message = direction ?
+                    `QR code detected ${direction}. Move closer.` :
+                    'QR code detected ahead. Move closer.';
+
+                updateResult(message);
+
+                if (shouldSpeak) {
+                    queueSpeech(message, 'normal');
+                    lastQRUpdateTime = now;
+                }
+
+            } else if (distance > 80) {
+                const steps = Math.round(distance / 30);
+                const message = `Almost there. Move ${steps} steps forward.`;
+                updateResult(message);
+
+                if (shouldSpeak) {
+                    queueSpeech(message, 'normal');
+                    lastQRUpdateTime = now;
+                }
+
+            } else if (distance >= OPTIMAL_DISTANCE_MIN && distance <= OPTIMAL_DISTANCE_MAX) {
+                processQRCode(qrResult.data);
+
+            } else if (distance < OPTIMAL_DISTANCE_MIN) {
+                updateResult('Too close to QR code. Step back slightly.');
+
+                if (shouldSpeak) {
+                    queueSpeech('Too close. Step back slightly.', 'normal');
+                    lastQRUpdateTime = now;
+                }
+            }
+        }
+
+        function processQRCode(qrData) {
+            const locationId = qrData.trim();
+
+            if (buildingGraph[locationId]) {
+                currentLocation = locationId;
+                const roomName = roomInfo[locationId] || locationId;
+
+                stopQRScanning();
+                currentMode = NavigationMode.DESTINATION_INPUT;
+
+                updateStatus(`Location confirmed: ${roomName}`);
+                updateResult(`You are at ${roomName}. Say your destination or use voice commands.`);
+
+                queueSpeech(`Location confirmed. You are at ${roomName}. Say go to followed by your destination.`, 'normal');
+
+                setTimeout(() => {
+                    if (currentMode === NavigationMode.DESTINATION_INPUT) {
+                        startListening();
+                    }
+                }, 2000);
+
+            } else {
+                updateResult(`Invalid QR code: ${qrData}`);
+                queueSpeech('Invalid QR code. Try another QR code.', 'urgent');
+            }
+        }
+
+        // NEW FUNCTION: Handle QR codes detected during navigation (checkpoints)
+        function handleRouteProgressQR(qrResult) {
+            const locationId = qrResult.data.trim();
+
+            // Validate QR code format
+            if (!buildingGraph[locationId]) {
+                console.log('Invalid checkpoint QR code:', locationId);
+                return; // Ignore invalid QR codes during navigation
+            }
+
+            const locationName = roomInfo[locationId] || locationId;
+            console.log('Checkpoint QR detected:', locationId, locationName);
+
+            // Check if this QR is on our current route
+            if (currentRoute && currentRoute.includes(locationId)) {
+                const qrPositionInRoute = currentRoute.indexOf(locationId);
+
+                console.log('QR position in route:', qrPositionInRoute, 'Current step:', routeStep);
+
+                // Check if this is forward progress on our route
+                if (qrPositionInRoute > routeStep) {
+                    // Advance to this checkpoint
+                    routeStep = qrPositionInRoute;
+                    currentLocation = locationId; // Update current location
+                    updateRouteDisplay();
+
+                    updateStatus(`Checkpoint reached: ${locationName}`);
+                    updateResult(`At ${locationName}. Continuing navigation.`);
+                    queueSpeech(`Reached ${locationName}`, 'normal');
+
+                    console.log('Advanced to checkpoint:', locationName, 'Step:', routeStep);
+
+                    // Check if we've arrived at destination
+                    if (qrPositionInRoute >= currentRoute.length - 1) {
+                        const destName = roomInfo[destination] || destination;
+                        updateStatus(`Arrived at destination: ${destName}`);
+                        updateResult(`Navigation complete. You have arrived at ${destName}.`);
+                        queueSpeech(`Arrived at ${destName}. Navigation complete!`, 'urgent');
+                        stopNavigation();
+                        return;
+                    }
+
+                } else if (qrPositionInRoute === routeStep) {
+                    // Already at this checkpoint - just confirm location
+                    updateStatus(`Confirmed location: ${locationName}`);
+                    queueSpeech(`Confirmed at ${locationName}`, 'info');
+
+                } else {
+                    // QR is behind us on the route (going backwards)
+                    updateStatus(`Passed checkpoint: ${locationName}`);
+                    queueSpeech(`Passed ${locationName}. Continue forward.`, 'info');
+                }
+
+            } else {
+                // QR code is not on our current route
+                if (locationId === destination) {
+                    // Somehow reached destination directly
+                    const destName = roomInfo[destination] || destination;
+                    updateStatus(`Arrived at destination: ${destName}`);
+                    updateResult(`Navigation complete. You have arrived at ${destName}.`);
+                    queueSpeech(`Arrived at ${destName}. Navigation complete!`, 'urgent');
+                    stopNavigation();
+                } else {
+                    // QR is off-route - provide guidance
+                    updateStatus(`Off-route location: ${locationName}`);
+                    queueSpeech(`You are at ${locationName}. This is not on your planned route.`, 'normal');
+
+                    // Optionally recalculate route from new location
+                    if (destination) {
+                        console.log('Recalculating route from new location:', locationId);
+                        const newRoute = findRoute(locationId, destination);
+                        if (newRoute) {
+                            currentRoute = newRoute;
+                            currentLocation = locationId;
+                            routeStep = 0;
+                            updateRouteDisplay();
+                            queueSpeech('Route recalculated from current position.', 'normal');
+                        }
+                    }
+                }
+            }
+        }
+
+        // === ROUTE CALCULATION FUNCTIONS ===
+
+        function findRoute(start, end) {
+            if (!buildingGraph[start] || !buildingGraph[end]) {
+                return null;
+            }
+
+            if (start === end) {
+                return [start];
+            }
+
+            const queue = [[start]];
+            const visited = new Set([start]);
+
+            while (queue.length > 0) {
+                const path = queue.shift();
+                const current = path[path.length - 1];
+
+                if (current === end) {
+                    return path;
+                }
+
+                const neighbors = buildingGraph[current] || [];
+                for (const neighbor of neighbors) {
+                    if (!visited.has(neighbor)) {
+                        visited.add(neighbor);
+                        queue.push([...path, neighbor]);
+                    }
+                }
+            }
+
+            return null;
+        }
+
+        function parseDestination(voiceInput) {
+            const input = voiceInput.toLowerCase().trim();
+            console.log('Parsing destination:', input);
+
+            let cleanInput = input;
+            if (input.includes('go to ')) {
+                cleanInput = input.split('go to ')[1];
+            } else if (input.includes('navigate to ')) {
+                cleanInput = input.split('navigate to ')[1];
+            } else if (input.includes('take me to ')) {
+                cleanInput = input.split('take me to ')[1];
+            }
+
+            cleanInput = cleanInput.trim();
+            console.log('Clean input:', cleanInput);
+
+            // Direct room name matching
+            for (const [id, name] of Object.entries(roomInfo)) {
+                if (cleanInput.includes(name.toLowerCase())) {
+                    console.log('Found direct match:', id, name);
+                    return id;
+                }
+            }
+
+            // Partial matching for common terms
+            const partialMatches = [
+                { keywords: ['cisco', 'lab 10', 'lab ten'], id: 'N010' },
+                { keywords: ['microsoft', 'software', 'lab 8', 'lab eight'], id: 'N008' },
+                { keywords: ['silverlake', 'silver lake', 'lab 9', 'lab nine'], id: 'N009' },
+                { keywords: ['ipstar', 'ip star', 'lab 11', 'lab eleven'], id: 'N011' },
+                { keywords: ['open office', 'openoffice', 'open classroom'], id: 'OpenOffice' },
+                { keywords: ['lecture room 1', 'room 1', 'lecture 1', 'n001'], id: 'N001' },
+                { keywords: ['lecture room 2', 'room 2', 'lecture 2', 'n002'], id: 'N002' },
+                { keywords: ['lecture room 3', 'room 3', 'lecture 3', 'n003'], id: 'N003' },
+                { keywords: ['lecture room 4', 'room 4', 'lecture 4', 'n004'], id: 'N004' },
+                { keywords: ['lecture room 5', 'room 5', 'lecture 5', 'n005'], id: 'N005' },
+                { keywords: ['lecture room 6', 'room 6', 'lecture 6', 'n006'], id: 'N006' },
+                { keywords: ['lab 12', 'lab twelve', 'n012'], id: 'N012' },
+                { keywords: ['lab 13', 'lab thirteen', 'n013'], id: 'N013' }
+            ];
+
+            for (const match of partialMatches) {
+                for (const keyword of match.keywords) {
+                    if (cleanInput.includes(keyword)) {
+                        console.log('Found partial match:', match.id, keyword);
+                        return match.id;
+                    }
+                }
+            }
+
+            console.log('No match found for:', cleanInput);
+            return null;
+        }
+
+        function startNavigation(destinationId) {
+            const route = findRoute(currentLocation, destinationId);
+
+            if (!route) {
+                updateResult('Cannot find route to destination.');
+                queueSpeech('Cannot find route to destination. Try a different location.', 'urgent');
+                return;
+            }
+
+            currentRoute = route;
+            destination = destinationId;
+            routeStep = 0;
+            currentMode = NavigationMode.NAVIGATING;
+
+            // Reset navigation instruction tracking
+            lastNavigationInstruction = '';
+            instructionRepeatCount = 0;
+            lastInstructionTime = 0;
+
+            const destName = roomInfo[destinationId] || destinationId;
+            updateStatus(`Navigating to ${destName}`);
+
+            const routePanel = document.getElementById('routePanel');
+            routePanel.classList.add('show');
+            updateRouteDisplay();
+
+            queueSpeech(`Route calculated to ${destName}. Starting navigation.`, 'normal');
+
+            startCamera();
+        }
+
+        function updateRouteDisplay() {
+            if (!currentRoute) return;
+
+            const routeContent = document.getElementById('routeContent');
+            const remaining = currentRoute.slice(routeStep);
+            const routeText = remaining.map(id => roomInfo[id] || id).join(' → ');
+            routeContent.textContent = `Route: ${routeText}`;
+        }
+
+        function getRouteInstruction() {
+            if (!currentRoute || routeStep >= currentRoute.length - 1) {
+                return 'You have arrived at your destination.';
+            }
+
+            const currentStep = currentRoute[routeStep];
+            const nextStep = currentRoute[routeStep + 1];
+            const nextName = roomInfo[nextStep] || nextStep;
+
+            return `Continue toward ${nextName}.`;
+        }
+
+        function advanceRoute() {
+            if (currentRoute && routeStep < currentRoute.length - 1) {
+                routeStep++;
+                updateRouteDisplay();
+
+                if (routeStep >= currentRoute.length - 1) {
+                    const destName = roomInfo[destination] || destination;
+                    queueSpeech(`Arrived at ${destName}. Navigation complete.`, 'urgent');
+                    stopNavigation();
+                }
+            }
+        }
+
+        function stopNavigation() {
+            currentMode = NavigationMode.IDLE;
+            currentRoute = null;
+            destination = null;
+            routeStep = 0;
+
+            // Reset navigation state
+            lastNavigationInstruction = '';
+            instructionRepeatCount = 0;
+
+            const routePanel = document.getElementById('routePanel');
+            routePanel.classList.remove('show');
+
+            updateStatus('Navigation stopped.');
+            stopCamera();
+        }
+
+        // === CAMERA FUNCTIONS ===
+
+        async function startCamera(qrMode = false) {
+            showLoading(true);
+            try {
+                if (stream) {
+                    stream.getTracks().forEach(track => track.stop());
+                }
+
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        facingMode: 'environment',
+                        width: { ideal: 640 },
+                        height: { ideal: 480 }
+                    }
+                });
+
+                sessionId = makeSessionId();
+                if (isApiOnline) {
+                    try {
+                        const response = await fetch(`${apiUrl}/start-session`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ session_id: sessionId }),
+                        });
+                        if (!response.ok) {
+                            console.warn('start-session endpoint not available');
+                        }
+                    } catch (e) {
+                        console.warn('start-session failed:', e.message);
+                    }
+                }
+
+                video.srcObject = stream;
+                const videoContainer = document.getElementById('videoContainer');
+                videoContainer.classList.add('show');
+
+                await video.play();
+
+                if (video.videoWidth > 0 && video.videoHeight > 0) {
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+
+                    if (qrMode) {
+                        currentMode = NavigationMode.QR_SCANNING;
+                        updateQRButton(true);
+                        updateStatus('QR scanner active. Point camera at QR code.');
+                        startScanning();
+                    } else {
+                        updateStatus('Camera started. Analyzing navigation environment...');
+                        updateCameraButton(true);
+                        scanning = true;
+                        startScanning();
+                    }
+                }
+
+            } catch (err) {
+                updateStatus('Error: Cannot access camera. Please allow camera permissions.');
+                queueSpeech('Camera access error. Please allow permissions.', 'urgent');
+                console.error('Camera error:', err);
+            }
+            showLoading(false);
+        }
+
+        function stopCamera() {
+            scanning = false;
+
+            if (currentAnalyzeController) {
+                try {
+                    currentAnalyzeController.abort();
+                } catch (err) {
+                    console.warn('Abort controller error:', err);
+                }
+                currentAnalyzeController = null;
+            }
+
+            if (sessionId) {
+                try {
+                    fetch(`${apiUrl}/stop-session`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ session_id: sessionId }),
+                    }).catch(e => console.warn('stop-session failed:', e));
+                } catch (e) { }
+                sessionId = null;
+            }
+
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
+            }
+
+            const videoContainer = document.getElementById('videoContainer');
+            videoContainer.classList.remove('show');
+
+            updateStatus('Camera stopped. Ready to navigate.');
+            updateCameraButton(false);
+            updateQRButton(false);
+        }
+
+        function startScanning() {
+            if (scanning || currentMode === NavigationMode.QR_SCANNING) {
+                scanFrame();
+            }
+        }
+
+        // === VOICE COMMAND HANDLING ===
+
+        function handleVoiceCommand(command) {
+            announceToScreenReader('Command received: ' + command);
+            updateVoiceStatus(`"${command}"`);
+            console.log('Processing voice command:', command);
+
+            if (command.includes('emergency') || command.includes('stop')) {
+                if (scanning) stopCamera();
+                if (currentMode !== NavigationMode.IDLE) {
+                    stopNavigation();
+                }
+                queueSpeech('Stopped', 'urgent', true);
+                return;
+            }
+
+            if (currentMode === NavigationMode.DESTINATION_INPUT) {
+                if (command.includes('go to') || command.includes('navigate to') || command.includes('take me to')) {
+                    const destinationId = parseDestination(command);
+                    if (destinationId) {
+                        const destName = roomInfo[destinationId] || destinationId;
+                        queueSpeech(`Going to ${destName}`, 'normal');
+                        stopListening();
+                        startNavigation(destinationId);
+                    } else {
+                        queueSpeech('Room not found. Try again.', 'normal');
+                    }
+                    return;
+                }
+            }
+
+            // Navigation-specific commands
+            if (currentMode === NavigationMode.NAVIGATING) {
+                if (command.includes('scan qr') || command.includes('checkpoint') || command.includes('check point')) {
+                    queueSpeech('Scanning for checkpoint QR code. Point camera at QR code.', 'normal');
+                    // Force QR detection on next frame by temporarily increasing sensitivity
+                    return;
+                }
+
+                if (command.includes('route') || command.includes('where am i going')) {
+                    if (currentRoute && destination) {
+                        const destName = roomInfo[destination] || destination;
+                        const remaining = currentRoute.slice(routeStep);
+                        const nextStop = remaining.length > 1 ? roomInfo[remaining[1]] || remaining[1] : destName;
+                        queueSpeech(`Going to ${destName}. Next: ${nextStop}`, 'normal');
+                    }
+                    return;
+                }
+
+                if (command.includes('progress') || command.includes('how far')) {
+                    if (currentRoute) {
+                        const totalSteps = currentRoute.length;
+                        const remainingSteps = totalSteps - routeStep;
+                        queueSpeech(`${remainingSteps} of ${totalSteps} waypoints remaining.`, 'normal');
+                    }
+                    return;
+                }
+            }
+
+            // General commands
+            if (command.includes('scan') || command.includes('qr')) {
+                startQRScanning();
+            } else if (command.includes('start') || command.includes('camera')) {
+                if (!currentLocation) {
+                    queueSpeech('Scan QR code first', 'normal');
+                } else {
+                    toggleCamera();
+                }
+            } else if (command.includes('stop')) {
+                if (currentMode === NavigationMode.NAVIGATING) {
+                    stopNavigation();
+                } else {
+                    stopCamera();
+                }
+            } else if (command.includes('where')) {
+                if (currentLocation) {
+                    const locationName = roomInfo[currentLocation] || currentLocation;
+                    queueSpeech(`At ${locationName}`, 'normal');
+                } else {
+                    queueSpeech('Location unknown', 'normal');
+                }
+            } else if (command.includes('what') || command.includes('describe')) {
+                readLastResult();
+            } else if (command.includes('help')) {
+                speakHelp();
+            } else if (command.includes('repeat')) {
+                if (lastResult) {
+                    queueSpeech(lastResult, 'normal');
+                } else {
+                    queueSpeech('Nothing to repeat', 'info');
+                }
+            }
+        }
+
+        // === FALLBACK NAVIGATION ===
+
+        function generateFallbackNavigation(imageData) {
+            try {
+                const img = new Image();
+                img.onload = () => {
+                    const tempCanvas = document.createElement('canvas');
+                    const tempCtx = tempCanvas.getContext('2d');
+                    tempCanvas.width = 160;
+                    tempCanvas.height = 120;
+
+                    tempCtx.drawImage(img, 0, 0, 160, 120);
+                    const imageDataObj = tempCtx.getImageData(0, 0, 160, 120);
+
+                    const zones = analyzePixelZones(imageDataObj);
+                    const command = generateBasicCommand(zones);
+
+                    handleNavigationResponse({
+                        instruction: `Fallback mode: ${command}`,
+                        is_urgent: command.includes('Stop') || command.includes('blocked'),
+                        zones: zones,
+                        processing_time_ms: 50
+                    });
+                };
+                img.src = `data:image/jpeg;base64,${imageData}`;
+            } catch (error) {
+                console.error('Fallback navigation error:', error);
+                queueSpeech('Navigation system processing', 'normal');
+            }
+        }
+
+        function analyzePixelZones(imageData) {
+            const width = imageData.width;
+            const height = imageData.height;
+            const data = imageData.data;
+
+            const leftZone = { obstacles: 0 };
+            const centerZone = { obstacles: 0 };
+            const rightZone = { obstacles: 0 };
+
+            for (let y = height * 0.4; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    const pixelIndex = (y * width + x) * 4;
+                    const r = data[pixelIndex];
+                    const g = data[pixelIndex + 1];
+                    const b = data[pixelIndex + 2];
+                    const brightness = (r + g + b) / 3;
+
+                    if (brightness < 80) {
+                        if (x < width / 3) leftZone.obstacles++;
+                        else if (x < 2 * width / 3) centerZone.obstacles++;
+                        else rightZone.obstacles++;
+                    }
+                }
+            }
+
+            const threshold = (width * height * 0.6) / 3 * 0.1;
+
+            return {
+                left: {
+                    status: leftZone.obstacles > threshold ? 'caution' : 'clear',
+                    occupancy_ratio: leftZone.obstacles / threshold
+                },
+                center: {
+                    status: centerZone.obstacles > threshold ? 'caution' : 'clear',
+                    occupancy_ratio: centerZone.obstacles / threshold
+                },
+                right: {
+                    status: rightZone.obstacles > threshold ? 'caution' : 'clear',
+                    occupancy_ratio: rightZone.obstacles / threshold
+                }
+            };
+        }
+
+        function generateEnhancedCommand(zones, currentLocation, nextWaypoint) {
+            const locationContext = getLocationContext(currentLocation);
+            const distance = calculateDistance(currentLocation, nextWaypoint);
+
+            if (zones.center.status === 'caution') {
+                if (zones.left.status === 'clear') {
+                    return `Obstacle ahead. Step left and continue for ${distance} steps`;
+                }
+                if (zones.right.status === 'clear') {
+                    return `Path blocked. Move right, then continue ${distance} steps`;
+                }
+                return `Stop. Path blocked. Check surroundings and proceed carefully`;
+            }
+
+            return `Path clear. Walk straight for ${distance} steps toward ${getDestinationDescription(nextWaypoint)}`;
+        }
+        function calculateStepsFromDistance(fromId, toId) {
+            // Estimate based on typical corridor lengths
+            const stepMappings = {
+                'NG8-N008': 8,
+                'NG8-NG7': 15,
+                'NG7-N007': 12,
+                // Add more mappings based on your floor plan
+            };
+            return stepMappings[`${fromId}-${toId}`] || 10; // Default
+        }
+        function provideDetailedAudioFeedback(instruction, locationContext) {
+            const enhancedInstruction = `${instruction}. ${locationContext.description}`;
+
+            // Add spatial audio cues
+            if (locationContext.hasRightTurn) {
+                playDirectionalSound('right');
+            }
+
+            queueSpeech(enhancedInstruction, 'normal');
+        }
+
+        // === VOICE SYSTEM ===
+
+        function setupContinuousVoice() {
+            setInterval(() => {
+                processVoiceQueue();
+            }, 50);
+
+            if ('speechSynthesis' in window) {
+                speechSynthesis.addEventListener('voiceschanged', () => {
+                    console.log('Voices loaded');
+                });
+            }
+        }
+
+        function queueSpeech(text, priority = 'normal', interrupt = false) {
+            if (!text) return;
+
+            const speechItem = {
+                text: text,
+                priority: priority,
+                timestamp: Date.now(),
+                interrupt: interrupt
+            };
+
+            if (priority === 'urgent' || interrupt) {
+                voiceQueue = voiceQueue.filter(item => item.priority === 'urgent');
+                voiceQueue.unshift(speechItem);
+
+                if (isSpeaking && speechSynthesis.speaking) {
+                    speechSynthesis.cancel();
+                    isSpeaking = false;
+                }
+            } else {
+                voiceQueue.push(speechItem);
+            }
+
+            // Limit queue size
+            if (voiceQueue.length > 5) {
+                voiceQueue = voiceQueue.slice(-5);
+            }
+        }
+
+        function processVoiceQueue() {
+            if (isSpeaking || voiceQueue.length === 0) return;
+
+            const speechItem = voiceQueue.shift();
+            speakImmediate(speechItem.text, speechItem.priority);
+        }
+
+        function speakImmediate(text, priority = 'normal') {
+            if (!('speechSynthesis' in window)) return;
+
+            isSpeaking = true;
+            const utterance = new SpeechSynthesisUtterance(text);
+
+            switch (priority) {
+                case 'urgent':
+                    utterance.rate = 1.3;
+                    utterance.pitch = 1.2;
+                    utterance.volume = 1;
+                    break;
+                case 'info':
+                    utterance.rate = 0.9;
+                    utterance.pitch = 0.9;
+                    utterance.volume = 0.8;
+                    break;
+                default:
+                    utterance.rate = 1.1;
+                    utterance.pitch = 1.0;
+                    utterance.volume = 0.9;
+            }
+
+            utterance.onend = () => {
+                isSpeaking = false;
+            };
+
+            utterance.onerror = () => {
+                isSpeaking = false;
+            };
+
+            try {
+                speechSynthesis.speak(utterance);
+            } catch (error) {
+                console.error('Speech error:', error);
+                isSpeaking = false;
+            }
+        }
+
+        // === API CONNECTION MANAGEMENT ===
+
+        async function testApiConnection() {
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 3000);
+
+                const response = await fetch(`${apiUrl}/health`, {
+                    signal: controller.signal
+                });
+
+                clearTimeout(timeoutId);
+
+                if (response.ok) {
+                    const health = await response.json();
+                    console.log('API Health:', health);
+                    isApiOnline = true;
+                    fallbackMode = false;
+                    updateConnectionStatus('online');
+                } else {
+                    throw new Error('API unhealthy');
+                }
+            } catch (error) {
+                console.error('API connection failed:', error);
+                isApiOnline = false;
+                fallbackMode = true;
+                updateConnectionStatus('fallback');
+            }
+        }
+
+        function updateConnectionStatus(status) {
+            const statusEl = document.getElementById('connectionStatus');
+            switch (status) {
+                case 'online':
+                    statusEl.textContent = 'Online';
+                    statusEl.className = 'connection-status connection-online';
+                    break;
+                case 'offline':
+                    statusEl.textContent = 'Offline';
+                    statusEl.className = 'connection-status connection-offline';
+                    break;
+                case 'fallback':
+                    statusEl.textContent = 'Fallback Mode';
+                    statusEl.className = 'connection-status connection-fallback';
+                    break;
+            }
+        }
+
+        function startConnectionMonitoring() {
+            setInterval(async () => {
+                if (!scanning) return;
+
+                try {
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 2000);
+
+                    const response = await fetch(`${apiUrl}/health`, {
+                        signal: controller.signal
+                    });
+
+                    clearTimeout(timeoutId);
+
+                    if (response.ok && !isApiOnline) {
+                        isApiOnline = true;
+                        fallbackMode = false;
+                        updateConnectionStatus('online');
+                        queueSpeech('Connection restored', 'info');
+                    }
+                } catch (error) {
+                    if (isApiOnline) {
+                        isApiOnline = false;
+                        fallbackMode = true;
+                        updateConnectionStatus('fallback');
+                        queueSpeech('Using fallback mode', 'info');
+                    }
+                }
+            }, 15000);
+        }
+
+        // === UTILITY FUNCTIONS ===
+
+        function makeSessionId() {
+            return 'sess-' + Math.random().toString(36).slice(2, 12);
+        }
+
+        function updateQRButton(active) {
+            const btn = document.getElementById('qrBtn');
+            if (active) {
+                btn.textContent = '📱 SCANNING QR - TAP TO STOP';
+                btn.classList.add('qr-scanning');
+            } else {
+                btn.textContent = '📱 TAP TO SCAN QR CODE';
+                btn.classList.remove('qr-scanning');
+            }
+        }
+
+        function toggleCamera() {
+            if (scanning) {
+                stopCamera();
+            } else {
+                if (!currentLocation) {
+                    queueSpeech('Please scan a QR code first to set your location', 'normal');
+                    return;
+                }
+                startCamera();
+            }
+        }
+
+        function updateStatus(message) {
+            document.getElementById('status').textContent = message;
+            announceToScreenReader(message);
+        }
+
+        function updateResult(result) {
+            document.getElementById('result').textContent = result;
+        }
+
+        function updateCameraButton(active) {
+            const btn = document.getElementById('cameraBtn');
+            if (active) {
+                btn.textContent = '🔍 NAVIGATION ACTIVE - TAP TO STOP';
+                btn.classList.add('active');
+            } else {
+                btn.textContent = 'TAP TO START NAVIGATION';
+                btn.classList.remove('active');
+            }
+        }
+
+        function updateVoiceButton(active) {
+            const btn = document.getElementById('voiceBtn');
+            if (active) {
+                btn.textContent = '🎤 LISTENING - TAP TO STOP';
+                btn.classList.add('listening');
+            } else {
+                btn.textContent = '🎤 TAP FOR VOICE COMMANDS';
+                btn.classList.remove('listening');
+            }
+        }
+
+        function updateVoiceStatus(message) {
+            const voiceStatus = document.getElementById('voiceStatus');
+            const voiceStatusText = document.getElementById('voiceStatusText');
+
+            if (message) {
+                voiceStatusText.textContent = message;
+                voiceStatus.classList.add('show');
+
+                setTimeout(() => {
+                    voiceStatus.classList.remove('show');
+                }, 3000);
+            } else {
+                voiceStatus.classList.remove('show');
+            }
+        }
+
+        function showLoading(show) {
+            const loading = document.getElementById('loading');
+            if (show) {
+                loading.classList.add('show');
+            } else {
+                loading.classList.remove('show');
+            }
+        }
+
+        // === SPEECH RECOGNITION ===
+
+        function setupSpeechRecognition() {
+            if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                recognition = new SpeechRecognition();
+
+                recognition.continuous = true;
+                recognition.interimResults = false;
+                recognition.lang = 'en-US';
+                recognition.maxAlternatives = 3;
+
+                recognition.onstart = function () {
+                    console.log('Speech recognition started');
+                    updateVoiceStatus('Listening...');
+                    recognitionRestarting = false;
+                };
+
+                recognition.onresult = function (event) {
+                    let finalTranscript = '';
+
+                    for (let i = event.resultIndex; i < event.results.length; i++) {
+                        if (event.results[i].isFinal) {
+                            let bestTranscript = '';
+                            let bestConfidence = 0;
+
+                            for (let j = 0; j < event.results[i].length; j++) {
+                                const alternative = event.results[i][j];
+                                if (alternative.confidence > bestConfidence) {
+                                    bestConfidence = alternative.confidence;
+                                    bestTranscript = alternative.transcript;
+                                }
+                            }
+
+                            finalTranscript += bestTranscript || event.results[i][0].transcript;
+                        }
+                    }
+
+                    if (finalTranscript.trim()) {
+                        const command = finalTranscript.toLowerCase().trim();
+                        console.log('Voice input:', command);
+                        updateVoiceStatus(`Heard: "${finalTranscript}"`);
+                        handleVoiceCommand(command);
+                        lastVoiceInputTime = Date.now();
+                    }
+                };
+
+                recognition.onerror = function (event) {
+                    console.log('Voice error:', event.error);
+                    updateVoiceStatus(`Error: ${event.error}`);
+
+                    if (event.error === 'no-speech') {
+                        updateVoiceStatus('No speech detected. Try speaking again.');
+                        return;
+                    }
+
+                    if (event.error === 'audio-capture') {
+                        updateVoiceStatus('Microphone error. Check permissions.');
+                        queueSpeech('Microphone access error.', 'urgent');
+                        stopListening();
+                        return;
+                    }
+
+                    if (event.error === 'not-allowed') {
+                        updateVoiceStatus('Microphone permission denied');
+                        queueSpeech('Microphone permission denied.', 'urgent');
+                        stopListening();
+                        return;
+                    }
+
+                    if (isListening && !recognitionRestarting) {
+                        recognitionRestarting = true;
+                        setTimeout(() => {
+                            if (isListening) {
+                                try {
+                                    recognition.start();
+                                } catch (e) {
+                                    console.log('Recognition restart failed:', e);
+                                    stopListening();
+                                }
+                            }
+                        }, 1000);
+                    }
+                };
+
+                recognition.onend = function () {
+                    console.log('Speech recognition ended');
+
+                    if (isListening && !recognitionRestarting) {
+                        recognitionRestarting = true;
+                        setTimeout(() => {
+                            if (isListening) {
+                                try {
+                                    recognition.start();
+                                } catch (e) {
+                                    console.log('Recognition auto-restart failed:', e);
+                                    setTimeout(() => {
+                                        if (isListening) {
+                                            try {
+                                                recognition.start();
+                                            } catch (e2) {
+                                                console.log('Recognition restart failed completely');
+                                                updateVoiceStatus('Voice recognition failed');
+                                                stopListening();
+                                            }
+                                        }
+                                    }, 2000);
+                                }
+                            }
+                        }, 100);
+                    }
+                };
+            } else {
+                console.warn('Speech recognition not available');
+                queueSpeech('Voice recognition not available on this device', 'info');
+            }
+        }
+
+        function toggleVoice() {
+            if (isListening) {
+                stopListening();
+            } else {
+                startListening();
+            }
+        }
+
+        function startListening() {
+            if (!recognition) {
+                queueSpeech('Speech recognition not available', 'info');
+                updateVoiceStatus('Speech recognition not available');
+                return;
+            }
+
+            if (isSpeaking && speechSynthesis.speaking) {
+                speechSynthesis.cancel();
+                isSpeaking = false;
+            }
+
+            isListening = true;
+            recognitionRestarting = false;
+            updateVoiceButton(true);
+
+            if (currentMode === NavigationMode.DESTINATION_INPUT) {
+                updateStatus('Listening for destination. Say "go to" followed by room name...');
+                updateVoiceStatus('Say "go to" + room name');
+                queueSpeech('Say go to followed by your destination.', 'normal');
+            } else {
+                updateStatus('Listening for voice commands...');
+                updateVoiceStatus('Voice commands active');
+                queueSpeech('Voice commands active. Say help for options.', 'info');
+            }
+
+            try {
+                recognition.start();
+            } catch (err) {
+                console.error('Speech recognition start error:', err);
+                updateVoiceStatus('Failed to start voice recognition');
+                stopListening();
+                queueSpeech('Voice recognition failed to start', 'info');
+            }
+        }
+
+        function stopListening() {
+            isListening = false;
+            recognitionRestarting = false;
+            updateVoiceButton(false);
+            updateVoiceStatus('');
+            updateStatus('Voice commands stopped.');
+            queueSpeech('Voice commands stopped', 'info');
+
+            if (recognition) {
+                try {
+                    recognition.stop();
+                } catch (err) {
+                    console.error('Speech recognition stop error:', err);
+                }
+            }
+        }
+
+        // === GESTURE AND KEYBOARD HANDLING ===
+
+        function setupGestureHandling() {
+            const container = document.getElementById('mainContainer');
+            let touchStartX, touchStartY, touchEndX, touchEndY;
+            const minSwipeDistance = 50;
+
+            container.addEventListener('touchstart', function (e) {
+                touchStartX = e.changedTouches[0].screenX;
+                touchStartY = e.changedTouches[0].screenY;
+            }, { passive: true });
+
+            container.addEventListener('touchend', function (e) {
+                touchEndX = e.changedTouches[0].screenX;
+                touchEndY = e.changedTouches[0].screenY;
+
+                const deltaX = touchEndX - touchStartX;
+                const deltaY = touchEndY - touchStartY;
+
+                if (Math.abs(deltaX) < minSwipeDistance && Math.abs(deltaY) < minSwipeDistance) {
+                    return;
+                }
+
+                if (Math.abs(deltaX) > Math.abs(deltaY)) {
+                    if (deltaX > 0) {
+                        if (currentMode === NavigationMode.IDLE && !currentLocation) {
+                            startQRScanning();
+                        } else {
+                            toggleCamera();
+                        }
+                        queueSpeech('Navigation toggled', 'info');
+                    } else {
+                        toggleVoice();
+                        queueSpeech('Voice command mode', 'info');
+                    }
+                } else {
+                    if (deltaY < 0) {
+                        readLastResult();
+                    } else {
+                        readCurrentStatus();
+                    }
+                }
+            });
+
+            let lastTap = 0;
+            container.addEventListener('touchend', function (e) {
+                const currentTime = new Date().getTime();
+                const tapLength = currentTime - lastTap;
+                if (tapLength < 500 && tapLength > 0) {
+                    clearResults();
+                    queueSpeech('Results cleared', 'info');
+                }
+                lastTap = currentTime;
+            });
+        }
+
+        function setupKeyboardNavigation() {
+            document.addEventListener('keydown', function (e) {
+                switch (e.key) {
+                    case 'q':
+                    case 'Q':
+                        startQRScanning();
+                        break;
+                    case 'c':
+                    case 'C':
+                        toggleCamera();
+                        break;
+                    case 'v':
+                    case 'V':
+                        toggleVoice();
+                        break;
+                    case 'r':
+                    case 'R':
+                        readLastResult();
+                        break;
+                    case 's':
+                    case 'S':
+                        readCurrentStatus();
+                        break;
+                    case 'h':
+                    case 'H':
+                        speakHelp();
+                        break;
+                    case 'l':
+                    case 'L':
+                        speakAvailableRooms();
+                        break;
+                    case 'Escape':
+                        clearResults();
+                        break;
+                }
+            });
+        }
+
+        // === ACCESSIBILITY FUNCTIONS ===
+
+        function readLastResult() {
+            if (lastResult) {
+                queueSpeech('Current instruction: ' + lastResult, 'normal', true);
+            } else {
+                queueSpeech('No navigation instruction available yet', 'info');
+            }
+        }
+
+        function readCurrentStatus() {
+            const status = document.getElementById('status').textContent;
+            queueSpeech('Status: ' + status, 'normal');
+
+            if (currentLocation) {
+                const locationName = roomInfo[currentLocation] || currentLocation;
+                queueSpeech(`Current location: ${locationName}`, 'info');
+            }
+
+            if (isApiOnline) {
+                queueSpeech('API connection active', 'info');
+            } else {
+                queueSpeech('Using fallback navigation mode', 'info');
+            }
+        }
+
+        function clearResults() {
+            lastResult = '';
+            lastSpokenInstruction = '';
+            lastNavigationInstruction = '';
+            instructionRepeatCount = 0;
+            updateResult('Navigation status cleared.');
+            updateStatus('Ready to start navigation.');
+        }
+
+        function speakHelp() {
+            let helpText = '';
+
+            if (!currentLocation) {
+                helpText = 'Say: scan QR code. Then say your destination.';
+            } else if (currentMode === NavigationMode.DESTINATION_INPUT) {
+                helpText = 'Say: go to cisco lab, or go to lecture room 1.';
+            } else if (currentMode === NavigationMode.NAVIGATING) {
+                helpText = 'During navigation: scan checkpoint QR codes for progress. Say: checkpoint, route, progress, stop.';
+            } else {
+                helpText = 'Commands: scan, start, stop, where am I, help.';
+            }
+
+            queueSpeech(helpText, 'normal', true);
+        }
+
+        function speakAvailableRooms() {
+            const roomList = Object.values(roomInfo).filter(name =>
+                !name.includes('Junction') && !name.includes('Corridor')
+            ).join(', ');
+            queueSpeech(`Available destinations: ${roomList}`, 'normal');
+        }
+
+        function announceToScreenReader(message) {
+            const announcements = document.getElementById('announcements');
+            announcements.textContent = message;
+        }
+
+        // === PERFORMANCE MONITORING ===
+
+        function getAverageProcessingTime() {
+            if (processingTimes.length === 0) return 0;
+            const sum = processingTimes.reduce((a, b) => a + b, 0);
+            return sum / processingTimes.length;
+        }
+
+        function logPerformanceStats() {
+            console.log('Performance Stats:', {
+                averageProcessingTime: getAverageProcessingTime(),
+                frameCount: frameCount,
+                voiceQueueLength: voiceQueue.length,
+                isApiOnline: isApiOnline,
+                fallbackMode: fallbackMode,
+                currentMode: currentMode,
+                currentLocation: currentLocation,
+                destination: destination,
+                isListening: isListening,
+                instructionRepeatCount: instructionRepeatCount
+            });
+        }
+
+        // Call performance logging every 30 seconds in development
+        if (window.location.hostname === 'localhost') {
+            setInterval(logPerformanceStats, 30000);
+        }
+
+        // Initialize everything when page loads
+        window.addEventListener('load', () => {
+            console.log('Navigation system initialized');
+        });
+    </script>
+</body>
+
+</html>
