@@ -513,7 +513,7 @@
         let lastResult = '';
         let lastSpokenInstruction = '';
         let apiUrl = 'https://7fbd7a57093a.ngrok-free.app';
-        //let apiUrl = 'http://192.168.0.13:8000';
+        //let apiUrl = 'http://localhost:8000';
         let isApiOnline = false;
         let fallbackMode = false;
         let processingQueue = [];
@@ -557,7 +557,7 @@
 
             setupSpeechRecognition();
             setupGestureHandling();
-            //setupKeyboardNavigation();
+            setupKeyboardNavigation();
             setupContinuousVoice();
 
             testApiConnection();
@@ -808,8 +808,7 @@
 
                     const response = await fetch(`${apiUrl}/analyze`, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
-
+                        headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(body),
                         signal: controller.signal
                     });
@@ -1206,15 +1205,33 @@
             cleanInput = cleanInput.trim();
             console.log('Clean input:', cleanInput);
 
-            // Direct room name matching
+            // NEW: Direct room ID matching (highest priority)
+            // Check if the clean input matches any room ID directly
+            const upperInput = cleanInput.toUpperCase();
+            if (buildingGraph[upperInput]) {
+                console.log('Found direct room ID match:', upperInput);
+                return upperInput;
+            }
+
+            // NEW: Handle spoken room IDs with spaces or variations
+            // Convert spoken versions like "n zero zero eight" to "N008"
+            const roomIdVariations = convertSpokenToRoomId(cleanInput);
+            for (const variation of roomIdVariations) {
+                if (buildingGraph[variation]) {
+                    console.log('Found room ID variation match:', variation);
+                    return variation;
+                }
+            }
+
+            // Existing: Direct room name matching
             for (const [id, name] of Object.entries(roomInfo)) {
                 if (cleanInput.includes(name.toLowerCase())) {
-                    console.log('Found direct match:', id, name);
+                    console.log('Found direct name match:', id, name);
                     return id;
                 }
             }
 
-            // Partial matching for common terms
+            // Existing: Partial matching for common terms
             const partialMatches = [
                 { keywords: ['cisco', 'lab 10', 'lab ten'], id: 'N010' },
                 { keywords: ['microsoft', 'software', 'lab 8', 'lab eight'], id: 'N008' },
@@ -1240,10 +1257,99 @@
                 }
             }
 
+            // NEW: Fallback - check if any part of input matches room IDs in buildingGraph
+            // This handles cases where room ID might be embedded in longer speech
+            const words = cleanInput.split(/\s+/);
+            for (const word of words) {
+                const upperWord = word.toUpperCase();
+                if (buildingGraph[upperWord]) {
+                    console.log('Found word match in buildingGraph:', upperWord);
+                    return upperWord;
+                }
+            }
+
             console.log('No match found for:', cleanInput);
             return null;
         }
 
+
+        function convertSpokenToRoomId(input) {
+            const variations = [];
+
+            // Number word mappings
+            const numberWords = {
+                'zero': '0', 'oh': '0',
+                'one': '1', 'won': '1',
+                'two': '2', 'too': '2', 'to': '2',
+                'three': '3',
+                'four': '4', 'for': '4',
+                'five': '5',
+                'six': '6',
+                'seven': '7',
+                'eight': '8', 'ate': '8',
+                'nine': '9',
+                'ten': '10',
+                'eleven': '11',
+                'twelve': '12',
+                'thirteen': '13'
+            };
+
+            // Handle patterns like "n zero zero eight", "n 008", "en zero zero eight"
+            const nPatterns = [
+                /\b(?:n|en)\s*(?:zero|oh|0)\s*(?:zero|oh|0)\s*(\w+)\b/,
+                /\b(?:n|en)\s*(\d{3})\b/,
+                /\b(?:n|en)\s*(\d+)\b/
+            ];
+
+            for (const pattern of nPatterns) {
+                const match = input.match(pattern);
+                if (match) {
+                    let number = match[1];
+                    // Convert word numbers to digits
+                    for (const [word, digit] of Object.entries(numberWords)) {
+                        number = number.replace(new RegExp(word, 'gi'), digit);
+                    }
+
+                    // Pad with zeros if needed
+                    if (number.length === 1) number = '00' + number;
+                    if (number.length === 2) number = '0' + number;
+
+                    variations.push('N' + number);
+                }
+            }
+
+            // Handle NG patterns like "ng eight", "ng 8"
+            const ngPatterns = [
+                /\b(?:ng|n\s*g)\s*(\w+)\b/,
+                /\b(?:ng|n\s*g)\s*(\d+)\b/
+            ];
+
+            for (const pattern of ngPatterns) {
+                const match = input.match(pattern);
+                if (match) {
+                    let number = match[1];
+                    // Convert word numbers to digits
+                    for (const [word, digit] of Object.entries(numberWords)) {
+                        number = number.replace(new RegExp(word, 'gi'), digit);
+                    }
+                    variations.push('NG' + number);
+                }
+            }
+
+            // Handle "ng south" patterns
+            if (input.includes('ng south') || input.includes('n g south')) {
+                const southMatch = input.match(/(?:ng|n\s*g)\s*south\s*(\w+|\d+)/);
+                if (southMatch) {
+                    let number = southMatch[1];
+                    for (const [word, digit] of Object.entries(numberWords)) {
+                        number = number.replace(new RegExp(word, 'gi'), digit);
+                    }
+                    variations.push('NG_SOUTH' + number);
+                }
+            }
+
+            return variations;
+        }
         function startNavigation(destinationId) {
             const route = findRoute(currentLocation, destinationId);
 
@@ -1348,7 +1454,7 @@
                     try {
                         const response = await fetch(`${apiUrl}/start-session`, {
                             method: 'POST',
-                            headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
+                            headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ session_id: sessionId }),
                         });
                         if (!response.ok) {
@@ -1406,7 +1512,7 @@
                 try {
                     fetch(`${apiUrl}/stop-session`, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
+                        headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ session_id: sessionId }),
                     }).catch(e => console.warn('stop-session failed:', e));
                 } catch (e) { }
@@ -1600,41 +1706,13 @@
             };
         }
 
-        function generateEnhancedCommand(zones, currentLocation, nextWaypoint) {
-            const locationContext = getLocationContext(currentLocation);
-            const distance = calculateDistance(currentLocation, nextWaypoint);
-
+        function generateBasicCommand(zones) {
             if (zones.center.status === 'caution') {
-                if (zones.left.status === 'clear') {
-                    return `Obstacle ahead. Step left and continue for ${distance} steps`;
-                }
-                if (zones.right.status === 'clear') {
-                    return `Path blocked. Move right, then continue ${distance} steps`;
-                }
-                return `Stop. Path blocked. Check surroundings and proceed carefully`;
+                if (zones.left.status === 'clear') return 'Go left';
+                if (zones.right.status === 'clear') return 'Go right';
+                return 'Slow down';
             }
-
-            return `Path clear. Walk straight for ${distance} steps toward ${getDestinationDescription(nextWaypoint)}`;
-        }
-        function calculateStepsFromDistance(fromId, toId) {
-            // Estimate based on typical corridor lengths
-            const stepMappings = {
-                'NG8-N008': 8,
-                'NG8-NG7': 15,
-                'NG7-N007': 12,
-                // Add more mappings based on your floor plan
-            };
-            return stepMappings[`${fromId}-${toId}`] || 10; // Default
-        }
-        function provideDetailedAudioFeedback(instruction, locationContext) {
-            const enhancedInstruction = `${instruction}. ${locationContext.description}`;
-
-            // Add spatial audio cues
-            if (locationContext.hasRightTurn) {
-                playDirectionalSound('right');
-            }
-
-            queueSpeech(enhancedInstruction, 'normal');
+            return 'Path clear';
         }
 
         // === VOICE SYSTEM ===
@@ -1733,9 +1811,6 @@
                 const timeoutId = setTimeout(() => controller.abort(), 3000);
 
                 const response = await fetch(`${apiUrl}/health`, {
-                    headers: {
-                        'ngrok-skip-browser-warning': 'true'
-                    },
                     signal: controller.signal
                 });
 
@@ -1785,9 +1860,6 @@
                     const timeoutId = setTimeout(() => controller.abort(), 2000);
 
                     const response = await fetch(`${apiUrl}/health`, {
-                        headers: {  // 👇 add this line
-                            'ngrok-skip-browser-warning': 'true'
-                        },
                         signal: controller.signal
                     });
 
@@ -2267,5 +2339,3 @@
 </body>
 
 </html>
-
-
