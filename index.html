@@ -512,9 +512,8 @@
         let isListening = false;
         let lastResult = '';
         let lastSpokenInstruction = '';
+        //let apiUrl = 'https://3963b7f787ad.ngrok-free.app/';
         let apiUrl = 'https://7fbd7a57093a.ngrok-free.app';
-        //let apiUrl = 'http://192.168.0.13:8000';
-        //let apiUrl = 'http://localhost:8080';
         let isApiOnline = false;
         let fallbackMode = false;
         let processingQueue = [];
@@ -809,8 +808,7 @@
 
                     const response = await fetch(`${apiUrl}/analyze`, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
-
+                        headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(body),
                         signal: controller.signal
                     });
@@ -1349,7 +1347,7 @@
                     try {
                         const response = await fetch(`${apiUrl}/start-session`, {
                             method: 'POST',
-                            headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
+                            headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ session_id: sessionId }),
                         });
                         if (!response.ok) {
@@ -1407,7 +1405,7 @@
                 try {
                     fetch(`${apiUrl}/stop-session`, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
+                        headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ session_id: sessionId }),
                     }).catch(e => console.warn('stop-session failed:', e));
                 } catch (e) { }
@@ -1734,9 +1732,6 @@
                 const timeoutId = setTimeout(() => controller.abort(), 3000);
 
                 const response = await fetch(`${apiUrl}/health`, {
-                    headers: {
-                        'ngrok-skip-browser-warning': 'true'
-                    },
                     signal: controller.signal
                 });
 
@@ -1786,9 +1781,6 @@
                     const timeoutId = setTimeout(() => controller.abort(), 2000);
 
                     const response = await fetch(`${apiUrl}/health`, {
-                        headers: {  // 👇 add this line
-                            'ngrok-skip-browser-warning': 'true'
-                        },
                         signal: controller.signal
                     });
 
