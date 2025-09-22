@@ -594,7 +594,7 @@
             queueSpeech(announcement, 'navigation');
         }
         function estimateStepsToPoint(fromPoint, toPoint) {
-            // Precise step estimates based on building layout
+            // Precise step estimates based on building layout (approximate)
             const stepMappings = {
                 'NG8-N008': 8, 'N008-NG8': 8,
                 'NG8-NG7': 15, 'NG7-NG8': 15,
@@ -621,8 +621,12 @@
                 'NG_SOUTH7-N013': 4, 'N013-NG_SOUTH7': 4
             };
 
+            // Optional runtime overrides: set window.stepMappingsOverride = { 'FROM-TO': steps }
+            const overrides = (typeof window !== 'undefined' && window.stepMappingsOverride) || {};
+            const allMappings = { ...stepMappings, ...overrides };
+
             const key = `${fromPoint}-${toPoint}`;
-            return stepMappings[key] || 12; // Default 12 steps
+            return allMappings[key] || 12; // Default 12 steps
         }
         function handleNavigationResponse(data) {
             try {
@@ -662,6 +666,16 @@
 
                 updateResult(preciseInstruction);
                 updateStatus(`Navigation: ${preciseInstruction}`);
+
+                // Throttle frequent person-detected announcements (min 1s)
+                if (preciseInstruction && preciseInstruction.toLowerCase().startsWith('person detected')) {
+                    const lastPersonAt = window.lastPersonSpeechTime || 0;
+                    if (now - lastPersonAt < 1000) {
+                        // Skip speaking/haptics if too soon
+                        return;
+                    }
+                    window.lastPersonSpeechTime = now;
+                }
 
                 // Enhanced audio feedback with precise instructions
                 provideDetailedAudioGuidance(directionalInstruction, preciseInstruction, isUrgent, data);
@@ -726,7 +740,8 @@
                 const estimatedSteps = estimateStepsToPoint(currentRoute[routeStep], nextPoint);
                 const walkingDirection = getWalkingDirection(currentRoute[routeStep], nextPoint);
 
-                preciseInstruction = `Path clear. Walk ${walkingDirection} for ${estimatedSteps} steps toward ${nextPointName}.`;
+                const meters = Math.round(estimatedSteps * 0.7);
+                preciseInstruction = `Path clear. Walk ${walkingDirection} for ${estimatedSteps} steps, about ${meters} meters, to ${nextPointName}.`;
 
                 // Add landmark information if available
                 const landmarks = getNearbyLandmarks(currentRoute[routeStep]);
@@ -805,15 +820,33 @@
             const landmarks = {
                 'NG8': ['main corridor junction', 'central area'],
                 'NG7': ['lecture hall approach', 'north corridor'],
+                'N001': ['Lecture Room 1 entrance'],
+                'N002': ['Lecture Room 2 entrance'],
+                'N003': ['Lecture Room 3 entrance'],
+                'N004': ['Lecture Room 4 entrance'],
+                'N005': ['Lecture Room 5 entrance'],
+                'N006': ['Lecture Room 6 entrance'],
                 'N007': ['corridor junction', 'lecture room area'],
+                'N008': ['Microsoft Lab door on left'],
+                'N009': ['Silverlake Lab door on left'],
+                'N010': ['Cisco Lab door on left'],
+                'N011': ['IPStar Lab door on left'],
+                'N012': ['Lab 12 door on left'],
+                'N013': ['Lab 13 door on left'],
                 'NG_SOUTH1': ['lab corridor entrance'],
                 'NG_SOUTH2': ['Microsoft Lab entrance on left'],
                 'NG_SOUTH3': ['Silverlake Lab entrance on left'],
                 'NG_SOUTH4': ['Cisco Lab entrance on left'],
+                'NG_SOUTH5': ['IPStar Lab entrance on left'],
+                'NG_SOUTH6': ['Lab 12 entrance on left'],
+                'NG_SOUTH7': ['Lab 13 entrance on left'],
                 'OpenOffice': ['open classroom area']
             };
 
-            return landmarks[currentPoint] || [];
+            // Optional runtime overrides: set window.landmarksOverride = { NODE: ['desc1', 'desc2'] }
+            const overrides = (typeof window !== 'undefined' && window.landmarksOverride) || {};
+            const merged = { ...landmarks, ...overrides };
+            return merged[currentPoint] || [];
         }
 
         function enhanceBaseInstruction(instruction, steps, direction) {
@@ -894,6 +927,16 @@
 
                 updateResult(instruction);
                 updateStatus(`Navigation: ${instruction}`);
+
+                // Throttle frequent person-detected announcements (min 1s)
+                if (instruction && instruction.toLowerCase().startsWith('person detected')) {
+                    const lastPersonAt = window.lastPersonSpeechTime || 0;
+                    if (now - lastPersonAt < 1000) {
+                        // Update UI but skip speaking/haptics if too soon
+                        return;
+                    }
+                    window.lastPersonSpeechTime = now;
+                }
 
                 // Enhanced audio feedback for directional instructions
                 provideAudioFeedbackForDirection(directionalInstruction, instruction, isUrgent);
@@ -1572,7 +1615,19 @@
             const nextStep = currentRoute[routeStep + 1];
             const nextName = roomInfo[nextStep] || nextStep;
 
-            return `Continue toward ${nextName}.`;
+            const steps = estimateStepsToPoint(currentStep, nextStep);
+            const walkingDirection = getWalkingDirection(currentStep, nextStep);
+
+            // Convert steps to approximate meters using average adult step length (0.7m)
+            const meters = Math.round(steps * 0.7);
+            let instruction = `Walk ${walkingDirection} for ${steps} steps, about ${meters} meters, toward ${nextName}.`;
+
+            const landmarks = getNearbyLandmarks(currentStep);
+            if (Array.isArray(landmarks) && landmarks.length > 0) {
+                instruction += ` Landmarks: ${landmarks.join(', ')}.`;
+            }
+
+            return instruction;
         }
 
         function advanceRoute() {
