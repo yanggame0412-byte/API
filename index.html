@@ -572,284 +572,6 @@
         });
 
         // === IMPROVED NAVIGATION LOGIC ===
-        function announceRouteProgress() {
-            if (!currentRoute || !destination) return;
-
-            const destName = roomInfo[destination] || destination;
-            const totalWaypoints = currentRoute.length;
-            const currentWaypoint = routeStep + 1;
-            const remainingWaypoints = totalWaypoints - routeStep - 1;
-
-            let announcement = `Route progress: Waypoint ${currentWaypoint} of ${totalWaypoints}. `;
-
-            if (remainingWaypoints > 0) {
-                const nextWaypointName = roomInfo[currentRoute[routeStep + 1]] || currentRoute[routeStep + 1];
-                const stepsToNext = estimateStepsToPoint(currentRoute[routeStep], currentRoute[routeStep + 1]);
-                announcement += `Next: ${nextWaypointName}, ${stepsToNext} steps. `;
-                announcement += `Final destination: ${destName}, ${remainingWaypoints} waypoints remaining.`;
-            } else {
-                announcement += `Approaching final destination: ${destName}.`;
-            }
-
-            queueSpeech(announcement, 'navigation');
-        }
-        function estimateStepsToPoint(fromPoint, toPoint) {
-            // Precise step estimates based on building layout
-            const stepMappings = {
-                'NG8-N008': 8, 'N008-NG8': 8,
-                'NG8-NG7': 15, 'NG7-NG8': 15,
-                'NG7-N007': 12, 'N007-NG7': 12,
-                'N007-OpenOffice': 6, 'OpenOffice-N007': 6,
-                'N007-N006': 10, 'N006-N007': 10,
-                'N006-N005': 10, 'N005-N006': 10,
-                'N005-N004': 10, 'N004-N005': 10,
-                'N004-N003': 10, 'N003-N004': 10,
-                'N003-N002': 10, 'N002-N003': 10,
-                'N002-N001': 10, 'N001-N002': 10,
-                'NG8-NG_SOUTH1': 5, 'NG_SOUTH1-NG8': 5,
-                'NG_SOUTH1-NG_SOUTH2': 8, 'NG_SOUTH2-NG_SOUTH1': 8,
-                'NG_SOUTH2-N008': 4, 'N008-NG_SOUTH2': 4,
-                'NG_SOUTH2-NG_SOUTH3': 12, 'NG_SOUTH3-NG_SOUTH2': 12,
-                'NG_SOUTH3-N009': 4, 'N009-NG_SOUTH3': 4,
-                'NG_SOUTH3-NG_SOUTH4': 12, 'NG_SOUTH4-NG_SOUTH3': 12,
-                'NG_SOUTH4-N010': 4, 'N010-NG_SOUTH4': 4,
-                'NG_SOUTH4-NG_SOUTH5': 12, 'NG_SOUTH5-NG_SOUTH4': 12,
-                'NG_SOUTH5-N011': 4, 'N011-NG_SOUTH5': 4,
-                'NG_SOUTH5-NG_SOUTH6': 12, 'NG_SOUTH6-NG_SOUTH5': 12,
-                'NG_SOUTH6-N012': 4, 'N012-NG_SOUTH6': 4,
-                'NG_SOUTH6-NG_SOUTH7': 12, 'NG_SOUTH7-NG_SOUTH6': 12,
-                'NG_SOUTH7-N013': 4, 'N013-NG_SOUTH7': 4
-            };
-
-            const key = `${fromPoint}-${toPoint}`;
-            return stepMappings[key] || 12; // Default 12 steps
-        }
-        function handleNavigationResponse(data) {
-            try {
-                let instruction = data.instruction || 'Navigation system processing';
-                const now = Date.now();
-
-                // Create precise, step-by-step instruction for blind users
-                const preciseInstruction = generatePreciseInstruction(data, instruction);
-
-                // Enhanced directional instruction processing
-                const directionalInstruction = parseDirectionalInstruction(preciseInstruction);
-
-                // Check if this is the same instruction as before
-                if (preciseInstruction === lastNavigationInstruction) {
-                    instructionRepeatCount++;
-
-                    // Only speak if enough time has passed or it's urgent
-                    const timeSinceLastInstruction = now - lastInstructionTime;
-                    const shouldSpeak = timeSinceLastInstruction > 4000 || // 4 seconds for more frequent updates
-                        data.is_urgent ||
-                        instructionRepeatCount === 1; // First repeat
-
-                    if (!shouldSpeak) {
-                        // Update UI but don't speak
-                        updateResult(preciseInstruction);
-                        return;
-                    }
-                } else {
-                    // New instruction
-                    instructionRepeatCount = 0;
-                    lastNavigationInstruction = preciseInstruction;
-                }
-
-                lastInstructionTime = now;
-
-                const isUrgent = data.is_urgent || directionalInstruction.isUrgent;
-
-                updateResult(preciseInstruction);
-                updateStatus(`Navigation: ${preciseInstruction}`);
-
-                // Enhanced audio feedback with precise instructions
-                provideDetailedAudioGuidance(directionalInstruction, preciseInstruction, isUrgent, data);
-
-                // Enhanced haptic feedback with distance information
-                provideEnhancedHapticFeedback(directionalInstruction, isUrgent, data);
-
-                lastResult = preciseInstruction;
-
-                console.log('Navigation Response:', {
-                    instruction: preciseInstruction,
-                    direction: directionalInstruction,
-                    urgent: isUrgent,
-                    repeatCount: instructionRepeatCount,
-                    zones: data.zones,
-                    processingTime: data.processing_time_ms
-                });
-
-            } catch (error) {
-                console.error('Navigation response handling error:', error);
-            }
-        }
-        function generatePreciseInstruction(data, baseInstruction) {
-            const zones = data.zones || {};
-            const currentSteps = estimateStepsToNextPoint();
-            const direction = getCurrentDirection();
-
-            // Build comprehensive instruction
-            let preciseInstruction = '';
-
-            // 1. Immediate obstacle information
-            if (zones.center && zones.center.status === 'blocked') {
-                if (zones.left && zones.left.status === 'clear') {
-                    preciseInstruction = `STOP. Path blocked ahead. Take 2 steps left, then continue forward.`;
-                } else if (zones.right && zones.right.status === 'clear') {
-                    preciseInstruction = `STOP. Path blocked ahead. Take 2 steps right, then continue forward.`;
-                } else {
-                    preciseInstruction = `STOP. Path completely blocked. Wait or find alternate route.`;
-                }
-                return preciseInstruction;
-            }
-
-            // 2. Person detection with spatial information
-            if (baseInstruction.toLowerCase().includes('person')) {
-                const personLocation = detectPersonLocation(zones);
-                preciseInstruction = `Person detected ${personLocation}. `;
-
-                if (personLocation.includes('left')) {
-                    preciseInstruction += `Move slightly right and continue.`;
-                } else if (personLocation.includes('right')) {
-                    preciseInstruction += `Move slightly left and continue.`;
-                } else {
-                    preciseInstruction += `Wait for person to pass or step aside.`;
-                }
-                return preciseInstruction;
-            }
-
-            // 3. Clear path with precise navigation
-            if (currentRoute && routeStep < currentRoute.length - 1) {
-                const nextPoint = currentRoute[routeStep + 1];
-                const nextPointName = roomInfo[nextPoint] || nextPoint;
-                const estimatedSteps = estimateStepsToPoint(currentRoute[routeStep], nextPoint);
-                const walkingDirection = getWalkingDirection(currentRoute[routeStep], nextPoint);
-
-                preciseInstruction = `Path clear. Walk ${walkingDirection} for ${estimatedSteps} steps toward ${nextPointName}.`;
-
-                // Add landmark information if available
-                const landmarks = getNearbyLandmarks(currentRoute[routeStep]);
-                if (landmarks.length > 0) {
-                    preciseInstruction += ` Landmarks: ${landmarks.join(', ')}.`;
-                }
-
-                // Add distance to destination
-                const remainingPoints = currentRoute.length - routeStep - 1;
-                if (remainingPoints > 1) {
-                    preciseInstruction += ` ${remainingPoints} waypoints remaining.`;
-                }
-
-                return preciseInstruction;
-            }
-
-            // 4. Fallback to enhanced base instruction
-            return enhanceBaseInstruction(baseInstruction, currentSteps, direction);
-        }
-        function estimateStepsToPoint(fromPoint, toPoint) {
-            // Precise step estimates based on building layout
-            const stepMappings = {
-                'NG8-N008': 8, 'N008-NG8': 8,
-                'NG8-NG7': 15, 'NG7-NG8': 15,
-                'NG7-N007': 12, 'N007-NG7': 12,
-                'N007-OpenOffice': 6, 'OpenOffice-N007': 6,
-                'N007-N006': 10, 'N006-N007': 10,
-                'N006-N005': 10, 'N005-N006': 10,
-                'N005-N004': 10, 'N004-N005': 10,
-                'N004-N003': 10, 'N003-N004': 10,
-                'N003-N002': 10, 'N002-N003': 10,
-                'N002-N001': 10, 'N001-N002': 10,
-                'NG8-NG_SOUTH1': 5, 'NG_SOUTH1-NG8': 5,
-                'NG_SOUTH1-NG_SOUTH2': 8, 'NG_SOUTH2-NG_SOUTH1': 8,
-                'NG_SOUTH2-N008': 4, 'N008-NG_SOUTH2': 4,
-                'NG_SOUTH2-NG_SOUTH3': 12, 'NG_SOUTH3-NG_SOUTH2': 12,
-                'NG_SOUTH3-N009': 4, 'N009-NG_SOUTH3': 4,
-                'NG_SOUTH3-NG_SOUTH4': 12, 'NG_SOUTH4-NG_SOUTH3': 12,
-                'NG_SOUTH4-N010': 4, 'N010-NG_SOUTH4': 4,
-                'NG_SOUTH4-NG_SOUTH5': 12, 'NG_SOUTH5-NG_SOUTH4': 12,
-                'NG_SOUTH5-N011': 4, 'N011-NG_SOUTH5': 4,
-                'NG_SOUTH5-NG_SOUTH6': 12, 'NG_SOUTH6-NG_SOUTH5': 12,
-                'NG_SOUTH6-N012': 4, 'N012-NG_SOUTH6': 4,
-                'NG_SOUTH6-NG_SOUTH7': 12, 'NG_SOUTH7-NG_SOUTH6': 12,
-                'NG_SOUTH7-N013': 4, 'N013-NG_SOUTH7': 4
-            };
-
-            const key = `${fromPoint}-${toPoint}`;
-            return stepMappings[key] || 12; // Default 12 steps
-        }
-
-        function getWalkingDirection(fromPoint, toPoint) {
-            // Determine walking direction based on building layout
-            const directions = {
-                'NG8-NG7': 'north',
-                'NG7-NG8': 'south',
-                'NG7-N007': 'west into corridor',
-                'N007-NG7': 'east to main hallway',
-                'N007-OpenOffice': 'straight ahead',
-                'OpenOffice-N007': 'back to corridor junction',
-                'NG8-NG_SOUTH1': 'south toward labs',
-                'NG_SOUTH1-NG8': 'north to main junction',
-                'NG_SOUTH2-N008': 'west into Microsoft Lab',
-                'N008-NG_SOUTH2': 'east to corridor',
-                'NG_SOUTH3-N009': 'west into Silverlake Lab',
-                'N009-NG_SOUTH3': 'east to corridor',
-                'NG_SOUTH4-N010': 'west into Cisco Lab',
-                'N010-NG_SOUTH4': 'east to corridor'
-            };
-
-            const key = `${fromPoint}-${toPoint}`;
-            return directions[key] || 'forward';
-        }
-
-        function getNearbyLandmarks(currentPoint) {
-            const landmarks = {
-                'NG8': ['main corridor junction', 'central area'],
-                'NG7': ['lecture hall approach', 'north corridor'],
-                'N007': ['corridor junction', 'lecture room area'],
-                'NG_SOUTH1': ['lab corridor entrance'],
-                'NG_SOUTH2': ['Microsoft Lab entrance on left'],
-                'NG_SOUTH3': ['Silverlake Lab entrance on left'],
-                'NG_SOUTH4': ['Cisco Lab entrance on left'],
-                'OpenOffice': ['open classroom area']
-            };
-
-            return landmarks[currentPoint] || [];
-        }
-
-        function enhanceBaseInstruction(instruction, steps, direction) {
-            if (instruction.toLowerCase().includes('clear')) {
-                return `Path clear. Continue ${direction} for approximately ${steps} steps.`;
-            } else if (instruction.toLowerCase().includes('blocked')) {
-                return `Path blocked. Stop and assess surroundings carefully.`;
-            }
-            return `${instruction} Continue carefully.`;
-        }
-
-        function estimateStepsToNextPoint() {
-            if (currentRoute && routeStep < currentRoute.length - 1) {
-                return estimateStepsToPoint(currentRoute[routeStep], currentRoute[routeStep + 1]);
-            }
-            return 10; // Default
-        }
-
-        function getCurrentDirection() {
-            if (currentRoute && routeStep < currentRoute.length - 1) {
-                return getWalkingDirection(currentRoute[routeStep], currentRoute[routeStep + 1]);
-            }
-            return 'forward';
-        }
-
-        function detectPersonLocation(zones) {
-            // Analyze zones to determine person location
-            if (zones.left && zones.left.occupancy_ratio > 0.3) {
-                return 'on your left';
-            } else if (zones.right && zones.right.occupancy_ratio > 0.3) {
-                return 'on your right';
-            } else if (zones.center && zones.center.occupancy_ratio > 0.3) {
-                return 'directly ahead';
-            }
-            return 'nearby';
-        }
 
         function handleNavigationResponse(data) {
             try {
@@ -1714,137 +1436,97 @@
         // === VOICE COMMAND HANDLING ===
 
         function handleVoiceCommand(command) {
-    announceToScreenReader('Command received: ' + command);
-    updateVoiceStatus(`"${command}"`);
-    console.log('Processing voice command:', command);
+            announceToScreenReader('Command received: ' + command);
+            updateVoiceStatus(`"${command}"`);
+            console.log('Processing voice command:', command);
 
-    // Clean and normalize the command - handle voice recognition issues with room numbers
-    const cleanCommand = normalizeVoiceInput(command);
-    
-    // Emergency stop - highest priority
-    if (cleanCommand.includes('emergency') || cleanCommand.includes('stop navigation') || cleanCommand.includes('cancel')) {
-        if (scanning) stopCamera();
-        if (currentMode !== NavigationMode.IDLE) {
-            stopNavigation();
-        }
-        stopListening(); // Stop listening after emergency command
-        queueSpeech('Navigation stopped', 'urgent', true);
-        return;
-    }
-
-    // Handle mode-specific commands first
-    if (currentMode === NavigationMode.DESTINATION_INPUT) {
-        if (cleanCommand.includes('go to') || cleanCommand.includes('navigate to') || cleanCommand.includes('take me to')) {
-            const destinationId = parseDestination(cleanCommand);
-            if (destinationId) {
-                const destName = roomInfo[destinationId] || destinationId;
-                queueSpeech(`Going to ${destName}`, 'normal');
-                stopListening(); // Stop listening after successful destination
-                startNavigation(destinationId);
-                return;
-            } else {
-                queueSpeech('Room not found. Try saying: go to cisco lab, or go to lecture room 1.', 'normal');
+            if (command.includes('emergency') || command.includes('stop')) {
+                if (scanning) stopCamera();
+                if (currentMode !== NavigationMode.IDLE) {
+                    stopNavigation();
+                }
+                queueSpeech('Stopped', 'urgent', true);
                 return;
             }
-        }
-        
-        // If in destination input mode but command doesn't match, provide help
-        if (!cleanCommand.includes('help') && !cleanCommand.includes('cancel')) {
-            queueSpeech('Say: go to, followed by room name. Say help for room list.', 'normal');
-            return;
-        }
-    }
 
-    // Navigation-specific commands
-    if (currentMode === NavigationMode.NAVIGATING) {
-        if (cleanCommand.includes('scan qr') || cleanCommand.includes('checkpoint') || cleanCommand.includes('check point')) {
-            queueSpeech('Looking for checkpoint QR code. Point camera at QR code.', 'normal');
-            return;
-        }
-
-        if (cleanCommand.includes('route') || cleanCommand.includes('where am i going')) {
-            if (currentRoute && destination) {
-                const destName = roomInfo[destination] || destination;
-                const remaining = currentRoute.slice(routeStep);
-                const nextStop = remaining.length > 1 ? roomInfo[remaining[1]] || remaining[1] : destName;
-                queueSpeech(`Going to ${destName}. Next: ${nextStop}`, 'normal');
-            } else {
-                queueSpeech('No active route', 'normal');
+            if (currentMode === NavigationMode.DESTINATION_INPUT) {
+                if (command.includes('go to') || command.includes('navigate to') || command.includes('take me to')) {
+                    const destinationId = parseDestination(command);
+                    if (destinationId) {
+                        const destName = roomInfo[destinationId] || destinationId;
+                        queueSpeech(`Going to ${destName}`, 'normal');
+                        stopListening();
+                        startNavigation(destinationId);
+                    } else {
+                        queueSpeech('Room not found. Try again.', 'normal');
+                    }
+                    return;
+                }
             }
-            return;
-        }
 
-        if (cleanCommand.includes('progress') || cleanCommand.includes('how far')) {
-            if (currentRoute) {
-                const totalSteps = currentRoute.length;
-                const remainingSteps = totalSteps - routeStep;
-                queueSpeech(`${remainingSteps} of ${totalSteps} waypoints remaining.`, 'normal');
-            } else {
-                queueSpeech('No active route', 'normal');
+            // Navigation-specific commands
+            if (currentMode === NavigationMode.NAVIGATING) {
+                if (command.includes('scan qr') || command.includes('checkpoint') || command.includes('check point')) {
+                    queueSpeech('Scanning for checkpoint QR code. Point camera at QR code.', 'normal');
+                    // Force QR detection on next frame by temporarily increasing sensitivity
+                    return;
+                }
+
+                if (command.includes('route') || command.includes('where am i going')) {
+                    if (currentRoute && destination) {
+                        const destName = roomInfo[destination] || destination;
+                        const remaining = currentRoute.slice(routeStep);
+                        const nextStop = remaining.length > 1 ? roomInfo[remaining[1]] || remaining[1] : destName;
+                        queueSpeech(`Going to ${destName}. Next: ${nextStop}`, 'normal');
+                    }
+                    return;
+                }
+
+                if (command.includes('progress') || command.includes('how far')) {
+                    if (currentRoute) {
+                        const totalSteps = currentRoute.length;
+                        const remainingSteps = totalSteps - routeStep;
+                        queueSpeech(`${remainingSteps} of ${totalSteps} waypoints remaining.`, 'normal');
+                    }
+                    return;
+                }
             }
-            return;
-        }
-        
-        if (cleanCommand.includes('stop') || cleanCommand.includes('end navigation')) {
-            stopNavigation();
-            queueSpeech('Navigation stopped', 'normal');
-            return;
-        }
-    }
 
-    // General commands available in any mode
-    if (cleanCommand.includes('scan') && cleanCommand.includes('qr')) {
-        startQRScanning();
-        return;
-    } 
-    
-    if (cleanCommand.includes('start camera') || cleanCommand.includes('start navigation')) {
-        if (!currentLocation) {
-            queueSpeech('Scan QR code first to set your location', 'normal');
-        } else {
-            toggleCamera();
+            // General commands
+            if (command.includes('scan') || command.includes('qr')) {
+                startQRScanning();
+            } else if (command.includes('start') || command.includes('camera')) {
+                if (!currentLocation) {
+                    queueSpeech('Scan QR code first', 'normal');
+                } else {
+                    toggleCamera();
+                }
+            } else if (command.includes('stop')) {
+                if (currentMode === NavigationMode.NAVIGATING) {
+                    stopNavigation();
+                } else {
+                    stopCamera();
+                }
+            } else if (command.includes('where')) {
+                if (currentLocation) {
+                    const locationName = roomInfo[currentLocation] || currentLocation;
+                    queueSpeech(`At ${locationName}`, 'normal');
+                } else {
+                    queueSpeech('Location unknown', 'normal');
+                }
+            } else if (command.includes('what') || command.includes('describe')) {
+                readLastResult();
+            } else if (command.includes('help')) {
+                speakHelp();
+            } else if (command.includes('repeat')) {
+                if (lastResult) {
+                    queueSpeech(lastResult, 'normal');
+                } else {
+                    queueSpeech('Nothing to repeat', 'info');
+                }
+            }
         }
-        return;
-    } 
-    
-    if (cleanCommand.includes('where am i') || cleanCommand.includes('current location')) {
-        if (currentLocation) {
-            const locationName = roomInfo[currentLocation] || currentLocation;
-            queueSpeech(`You are at ${locationName}`, 'normal');
-        } else {
-            queueSpeech('Location unknown. Scan a QR code first.', 'normal');
-        }
-        return;
-    }
-    
-    if (cleanCommand.includes('what') || cleanCommand.includes('describe') || cleanCommand.includes('repeat')) {
-        if (lastResult) {
-            queueSpeech(lastResult, 'normal');
-        } else {
-            queueSpeech('No instructions available yet', 'info');
-        }
-        return;
-    }
-    
-    if (cleanCommand.includes('help')) {
-        speakHelp();
-        return;
-    }
-    
-    if (cleanCommand.includes('room list') || cleanCommand.includes('available rooms')) {
-        speakAvailableRooms();
-        return;
-    }
 
-    // If no command matched, provide contextual help
-    if (currentMode === NavigationMode.IDLE) {
-        queueSpeech('Say: scan QR code, or help for commands', 'normal');
-    } else if (currentMode === NavigationMode.DESTINATION_INPUT) {
-        queueSpeech('Say: go to, followed by room name', 'normal');
-    } else {
-        queueSpeech('Command not recognized. Say help for options.', 'normal');
-    }
-}
         // === FALLBACK NAVIGATION ===
 
         function generateFallbackNavigation(imageData) {
@@ -2011,46 +1693,28 @@
             isSpeaking = true;
             const utterance = new SpeechSynthesisUtterance(text);
 
-            // Enhanced voice settings for different instruction types
             switch (priority) {
                 case 'urgent':
-                    utterance.rate = 1.0;      // Slower for clarity in emergencies
-                    utterance.pitch = 1.3;
-                    utterance.volume = 1.0;
-                    break;
-                case 'navigation':
-                    utterance.rate = 0.9;      // Slower for precise instructions
-                    utterance.pitch = 1.0;
-                    utterance.volume = 0.95;
+                    utterance.rate = 1.3;
+                    utterance.pitch = 1.2;
+                    utterance.volume = 1;
                     break;
                 case 'info':
-                    utterance.rate = 1.1;
+                    utterance.rate = 0.9;
                     utterance.pitch = 0.9;
                     utterance.volume = 0.8;
                     break;
                 default:
-                    utterance.rate = 1.0;
+                    utterance.rate = 1.1;
                     utterance.pitch = 1.0;
                     utterance.volume = 0.9;
-            }
-
-            // Try to use a clear, professional voice
-            const voices = speechSynthesis.getVoices();
-            const preferredVoices = voices.filter(voice =>
-                voice.lang.includes('en') &&
-                (voice.name.includes('Female') || voice.name.includes('Male'))
-            );
-
-            if (preferredVoices.length > 0) {
-                utterance.voice = preferredVoices[0];
             }
 
             utterance.onend = () => {
                 isSpeaking = false;
             };
 
-            utterance.onerror = (event) => {
-                console.error('Speech synthesis error:', event);
+            utterance.onerror = () => {
                 isSpeaking = false;
             };
 
@@ -2516,63 +2180,21 @@
         }
 
         function readCurrentStatus() {
-            let statusMessage = '';
+            const status = document.getElementById('status').textContent;
+            queueSpeech('Status: ' + status, 'normal');
 
-            // Current location information
             if (currentLocation) {
                 const locationName = roomInfo[currentLocation] || currentLocation;
-                statusMessage += `Current location: ${locationName}. `;
-
-                // Add context about nearby locations
-                const nearbyLocations = getNearbyLandmarks(currentLocation);
-                if (nearbyLocations.length > 0) {
-                    statusMessage += `Nearby: ${nearbyLocations.join(', ')}. `;
-                }
-            } else {
-                statusMessage += 'Location not set. Scan a QR code first. ';
+                queueSpeech(`Current location: ${locationName}`, 'info');
             }
 
-            // Navigation status
-            if (currentMode === NavigationMode.NAVIGATING && destination) {
-                const destName = roomInfo[destination] || destination;
-                const totalSteps = currentRoute ? currentRoute.length : 0;
-                const remainingSteps = currentRoute ? currentRoute.length - routeStep : 0;
-                const progressPercent = totalSteps > 0 ? Math.round(((totalSteps - remainingSteps) / totalSteps) * 100) : 0;
-
-                statusMessage += `Navigating to ${destName}. Progress: ${progressPercent}%. ${remainingSteps} waypoints remaining. `;
-
-                if (currentRoute && routeStep < currentRoute.length - 1) {
-                    const nextPoint = currentRoute[routeStep + 1];
-                    const nextName = roomInfo[nextPoint] || nextPoint;
-                    const stepsToNext = estimateStepsToPoint(currentRoute[routeStep], nextPoint);
-                    statusMessage += `Next destination: ${nextName}, approximately ${stepsToNext} steps away. `;
-                }
-            } else if (currentMode === NavigationMode.DESTINATION_INPUT) {
-                statusMessage += 'Ready for destination input. Say go to followed by room name. ';
-            } else {
-                statusMessage += 'Navigation ready. ';
-            }
-
-            // System status
             if (isApiOnline) {
-                statusMessage += 'Advanced navigation active with object detection. ';
+                queueSpeech('API connection active', 'info');
             } else {
-                statusMessage += 'Basic navigation mode active. ';
+                queueSpeech('Using fallback navigation mode', 'info');
             }
-
-            // Camera and scanning status
-            if (scanning) {
-                statusMessage += 'Camera active for navigation. ';
-            } else {
-                statusMessage += 'Camera not active. ';
-            }
-
-            if (isListening) {
-                statusMessage += 'Voice commands active. ';
-            }
-
-            queueSpeech(statusMessage, 'navigation');
         }
+
         function clearResults() {
             lastResult = '';
             lastSpokenInstruction = '';
@@ -2586,37 +2208,25 @@
             let helpText = '';
 
             if (!currentLocation) {
-                helpText = 'To start: Say scan QR code to find your location. Point your camera at any room QR code. Once located, say go to followed by your destination room name.';
+                helpText = 'Say: scan QR code. Then say your destination.';
             } else if (currentMode === NavigationMode.DESTINATION_INPUT) {
-                helpText = 'Say your destination. Examples: go to Cisco Lab, go to Microsoft Lab, go to Lecture Room 1, go to Open Office classroom. Available labs: Cisco, Microsoft, Silverlake, IPSTAR. Available lecture rooms: 1 through 6.';
+                helpText = 'Say: go to cisco lab, or go to lecture room 1.';
             } else if (currentMode === NavigationMode.NAVIGATING) {
-                const destName = roomInfo[destination] || destination;
-                const remainingSteps = currentRoute ? currentRoute.length - routeStep : 0;
-                helpText = `Navigating to ${destName}. ${remainingSteps} waypoints remaining. Commands: scan checkpoint for progress updates, where am I for current location, route for destination info, stop to end navigation. Listen for step counts and directional beeps.`;
+                helpText = 'During navigation: scan checkpoint QR codes for progress. Say: checkpoint, route, progress, stop.';
             } else {
-                helpText = 'Main commands: scan QR code to set location, start navigation to begin walking, voice commands for hands-free control. Say where am I for current location, repeat for last instruction.';
+                helpText = 'Commands: scan, start, stop, where am I, help.';
             }
 
-            queueSpeech(helpText, 'navigation', true);
+            queueSpeech(helpText, 'normal', true);
         }
 
         function speakAvailableRooms() {
-            const roomCategories = {
-                'Computer Labs': ['Microsoft Software Engineering Lab', 'Silverlake Lab', 'Cisco Lab', 'IPSTAR Lab'],
-                'Lecture Rooms': ['Lecture Room 1', 'Lecture Room 2', 'Lecture Room 3', 'Lecture Room 4', 'Lecture Room 5', 'Lecture Room 6'],
-                'Classrooms': ['Open-Office Classroom'],
-                'Additional Labs': ['Lab N012', 'Lab N013']
-            };
-
-            let roomList = 'Available destinations: ';
-            for (const [category, rooms] of Object.entries(roomCategories)) {
-                roomList += `${category}: ${rooms.join(', ')}. `;
-            }
-
-            roomList += 'Say go to followed by the room name. For example: go to Cisco Lab or go to Lecture Room 3.';
-
-            queueSpeech(roomList, 'navigation');
+            const roomList = Object.values(roomInfo).filter(name =>
+                !name.includes('Junction') && !name.includes('Corridor')
+            ).join(', ');
+            queueSpeech(`Available destinations: ${roomList}`, 'normal');
         }
+
         function announceToScreenReader(message) {
             const announcements = document.getElementById('announcements');
             announcements.textContent = message;
